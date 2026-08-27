@@ -15,7 +15,6 @@ an empty database and compares the result to the models.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from decimal import Decimal
 from typing import Any, NamedTuple
 
 import pytest
@@ -24,6 +23,8 @@ from sqlalchemy.orm import Session
 
 import app.db.session as session_module
 from app.db.models import Base, Source, ToleranceProfile
+from app.sources import DEFAULT_TOLERANCES, LEDGER, STATEMENT
+from core.tolerance import tolerances_from_config
 
 # Importing app.db.session is what registers the connect hook that turns on
 # foreign key enforcement, so the schema's declared integrity rules actually
@@ -139,49 +140,21 @@ class SeededSources(NamedTuple):
 # Column maps for the sample files in ``data/``. Enough for a test that needs a
 # plausible configured source; ``app/sources.py`` is the authority for the real
 # ones, and a test that cares about parsing should use those.
-LEDGER_FORMAT: dict[str, Any] = {
-    "columns": {
-        "reference": "trade_id",
-        "occurred_at": "traded_at",
-        "instrument": "instrument",
-        "side": "side",
-        "quantity": "quantity",
-        "unit_price": "price",
-        "gross_amount": "gross_amount",
-        "status": "state",
-    },
-    "timestamp_formats": ["%Y-%m-%dT%H:%M:%SZ"],
-    "timezone": "UTC",
-    "side_map": {"BUY": "BUY", "SELL": "SELL"},
-    "status_map": {"SETTLED": "SETTLED", "PENDING": "PENDING", "CANCELLED": "CANCELLED"},
-}
+# Source formats and thresholds come from app/sources.py, which is the single
+# authority. Duplicating them here once meant the fixtures said five basis
+# points was Decimal("5") while core.model says it is a fraction - under which
+# reading the brief's own worked example, 34,000.00 against 34,170.00, reports
+# as agreed rather than as the break it is.
+LEDGER_FORMAT: dict[str, Any] = LEDGER
+STATEMENT_FORMAT: dict[str, Any] = STATEMENT
 
-STATEMENT_FORMAT: dict[str, Any] = {
-    "columns": {
-        "reference": "reference",
-        "occurred_at": "executed_at",
-        "instrument": "symbol",
-        "side": "direction",
-        "quantity": "qty",
-        "unit_price": "unit_price",
-        "gross_amount": "total",
-        "status": "status",
-    },
-    "timestamp_formats": ["%Y-%m-%d %H:%M:%S"],
-    "timezone": "UTC",
-    "side_map": {"B": "BUY", "S": "SELL"},
-    "status_map": {"SETTLED": "SETTLED", "PENDING": "PENDING", "CANCELLED": "CANCELLED"},
-}
-
-# SPEC section 5.5, stated once. A test that hard-codes a threshold of its own
-# will keep passing after the tolerance is changed, which is the failure mode
-# TR-405 exists to prevent.
-QUANTITY_BPS = Decimal("1")
-PRICE_BPS = Decimal("5")
-AMOUNT_BPS = Decimal("5")
-AMOUNT_ABS_FLOOR = Decimal("0.01")
-TIME_TOLERANCE_SECONDS = 300  # 5 minutes
-SUGGEST_WINDOW_SECONDS = 7200  # 2 hours, SPEC D5
+_TOLERANCES = tolerances_from_config(DEFAULT_TOLERANCES)
+QUANTITY_BPS = _TOLERANCES.qty_bps
+PRICE_BPS = _TOLERANCES.price_bps
+AMOUNT_BPS = _TOLERANCES.amount_bps
+AMOUNT_ABS_FLOOR = _TOLERANCES.amount_abs_floor
+TIME_TOLERANCE_SECONDS = _TOLERANCES.time_tolerance_seconds
+SUGGEST_WINDOW_SECONDS = _TOLERANCES.suggest_window_seconds
 
 
 @pytest.fixture

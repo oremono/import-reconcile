@@ -126,17 +126,23 @@ def build() -> tuple[list[dict], list[dict], list[dict]]:
             "_case": case,
         }
 
+        # A sub-dollar instrument needs more than two decimal places for a
+        # half-percent price move to survive rounding. Quantising a broken
+        # price to cents silently un-breaks it on ADA at 0.57, which is how a
+        # case that claims to be a break ends up agreeing.
+        price_step = Decimal("0.00000001") if Decimal(price) < 1 else Decimal("0.01")
+
         if case == "drift_amount":
             srow["total"] = _bump(gross, "0.02")
         elif case == "drift_time":
             srow["executed_at"] = (ts + timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")
         elif case in {"verbatim_amount_break", "break_amount"}:
-            new_price = (Decimal(price) * Decimal("1.005")).quantize(Decimal("0.01"))
-            srow["unit_price"] = str(new_price)
+            new_price = (Decimal(price) * Decimal("1.005")).quantize(price_step)
+            srow["unit_price"] = _trim(str(new_price))
             srow["total"] = _gross(qty, str(new_price))
         elif case == "break_price_and_amount":
-            new_price = (Decimal(price) + Decimal("450")).quantize(Decimal("0.01"))
-            srow["unit_price"] = str(new_price)
+            new_price = (Decimal(price) + Decimal("450")).quantize(price_step)
+            srow["unit_price"] = _trim(str(new_price))
             srow["total"] = _gross(qty, str(new_price))
         elif case == "verbatim_time_break":
             srow["executed_at"] = (ts + timedelta(minutes=40)).strftime("%Y-%m-%d %H:%M:%S")

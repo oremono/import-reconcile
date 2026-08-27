@@ -42,7 +42,7 @@ Numbering is grouped in hundreds so items can be inserted later without renumber
 | ID | Requirement | Traces to | Verified by |
 |---|---|---|---|
 | TR-301 | `core.match.match` is a pure function. Identical inputs produce identical outputs, and it performs no IO of any kind. | brief, R4.* | `test_match.py`; `test_boundaries.py` |
-| TR-302 | `core/` imports only the standard library. Any `sqlalchemy`, `fastapi`, or `app` import fails the test suite. | brief | `test_boundaries.py::test_core_imports` |
+| TR-302 | `core/` imports only the standard library. Any `sqlalchemy`, `fastapi`, or `app` import fails the test suite. | brief | `test_boundaries.py::test_core_imports_stdlib_only` |
 | TR-303 | Output ordering is deterministic. Equally-ranked candidates break ties on reference, then on source row number. | NFR | `test_match.py::test_deterministic` |
 | TR-304 | Stored resolutions are applied before any automatic matching runs. | R4.1, R7.4 | `test_match.py::test_carry_forward_first` |
 | TR-305 | Cancelled records are partitioned out before matching and appear in no matched, suggested, or unmatched result. | R3.1, R3.2, AC3 | `test_match.py::test_cancelled_excluded` |
@@ -54,7 +54,7 @@ Numbering is grouped in hundreds so items can be inserted later without renumber
 | TR-311 | Each record appears in at most one pair. This holds in the match result and is separately enforced by database constraint. | R4.8, D11 | `test_match.py::test_one_to_one`; migration |
 | TR-312 | Unmatched records are reported for both sources in the same result object. | R4.7, AC6 | `test_match.py::test_both_directions` |
 | TR-313 | An `accept_unmatched` resolution whose reference gains a counterpart is revoked in the result and reported as a revocation. | R7.7, D10, AC11 | `test_match.py::test_auto_revoke` |
-| TR-314 | Candidate search buckets by `(instrument, side)`. It never compares every left record against every right record. | NFR | `test_perf.py::test_no_cross_product` |
+| TR-314 | Candidate search buckets by `(instrument, side)`. It never compares every left record against every right record. | NFR | `test_match.py::test_candidate_search_does_not_compare_every_pair` |
 | TR-315 | Confirming a suggestion is stored as a manual match and carries forward identically to one created from scratch. | R4.5 | `test_durability.py::test_confirmed_suggestion_persists` |
 | TR-316 | A manually created pair is compared by the same code path as an automatic one, and is therefore reportable as a break. Neither side is treated as authoritative. | R7.5, D12 | `test_match.py::test_manual_pair_compared` |
 | TR-317 | A resolution survives a correction that changes the values beneath it. The pair stands and is re-compared against the new values. | R7.6, D9 | `test_durability.py::test_survives_correction` |
@@ -83,7 +83,7 @@ Numbering is grouped in hundreds so items can be inserted later without renumber
 
 | ID | Requirement | Traces to | Verified by |
 |---|---|---|---|
-| TR-501 | Record rows are never updated or deleted. A correction writes new rows under a new batch. | R8.1, R8.2 | `test_corrections.py`; `test_boundaries.py::test_no_record_update` |
+| TR-501 | Record rows are never updated or deleted. A correction writes new rows under a new batch. | R8.1, R8.2 | `test_corrections.py`; `test_boundaries.py::test_records_are_never_mutated` |
 | TR-502 | Run rows are append-only. A re-run creates a new run rather than overwriting one. | R8.1 | `test_reconcile.py::test_runs_append_only` |
 | TR-503 | Unique constraint on `(source_id, content_hash)`. | R1.2 | migration |
 | TR-504 | Unique constraints on `(run_id, left_record_id)` and `(run_id, right_record_id)`. | R4.8 | migration; `test_types.py::test_pair_uniqueness` |
