@@ -27,9 +27,13 @@ database is SQLite by default. Postgres is a `DATABASE_URL` and nothing else.
 
 ```bash
 uv run pytest tests/unit    # no database, no browser
-uv run pytest               # everything
+uv run pytest               # everything hermetic
 make verify                 # lint, types, both suites, coverage, requirement trace
+make e2e                    # a real browser against a real server
 ```
+
+The browser suite is opt-in, so `make verify` stays runnable by a reviewer who
+has not installed one. To run it: `uv run playwright install chromium`.
 
 `make verify` is the definition of done. It parses the *Verified by* column of
 [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) and reports how many of the 82

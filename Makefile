@@ -1,4 +1,4 @@
-.PHONY: verify test unit lint types run seed fmt
+.PHONY: verify test unit e2e lint types run seed fmt
 
 verify:
 	uv run python scripts/verify.py
@@ -8,6 +8,9 @@ unit:
 
 test:
 	uv run pytest
+
+e2e:
+	uv run pytest -m e2e
 
 lint:
 	uv run ruff check .

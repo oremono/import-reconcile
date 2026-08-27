@@ -21,6 +21,7 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.8",
     "mypy>=1.14",
+    "pytest-playwright>=0.9.0",
 ]
 
 [tool.uv]
@@ -29,7 +30,10 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-q --strict-markers"
+# The browser suite is opt-in: `make verify` must stay runnable by a
+# reviewer who has not installed a browser. `make e2e` runs it.
+addopts = "-q --strict-markers -m 'not e2e'"
+markers = ["e2e: drives a real browser against a real server"]
 filterwarnings = ["error::DeprecationWarning"]
 
 [tool.coverage.run]
