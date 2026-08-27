@@ -23,6 +23,7 @@ from app.services.ingest import (
     content_digest,
     ingest_file,
 )
+from core.format import FormatConfigError
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 PERIOD = (date(2025, 7, 1), date(2025, 7, 7))
@@ -181,7 +182,7 @@ def test_rollback_on_failure(db_session: Session, seeded_sources) -> None:
     broken.format_config = {**broken.format_config, "timezone": "Mars/Olympus"}
     db_session.flush()
 
-    with pytest.raises(Exception):
+    with pytest.raises(FormatConfigError):
         load(db_session, broken, STATEMENT)
 
     db_session.rollback()
