@@ -85,7 +85,7 @@ tests/integration/
 
 ## 5. Data model
 
-Nine tables. The migration is the authority; this is the intent. Several requirements are satisfied **by a constraint rather than by code**, which is deliberate — application logic can be bypassed, a unique index cannot.
+Ten tables. The migration is the authority; this is the intent. Several requirements are satisfied **by a constraint rather than by code**, which is deliberate — application logic can be bypassed, a unique index cannot.
 
 | Table | Purpose | Key constraints | Satisfies |
 |---|---|---|---|
@@ -96,6 +96,7 @@ Nine tables. The migration is the authority; this is the intent. Several require
 | `rejected_row` | `batch_id`, `row_no`, `raw`, `reason`. Bad rows never block good ones. | — | TR-106 |
 | `run` | Source pair, period, timings, `counts` JSON. Append-only. | — | TR-502, TR-512 |
 | `pair` | `run_id`, both record ids, `origin` (`reference` / `suggested` / `manual`), `verdict`, `resolution_id`. | **unique `(run_id, left_record_id)` and `(run_id, right_record_id)`** | TR-311, TR-504 |
+| `field_diff` | One compared field of one pair: both values, absolute and relative difference, whether it is within tolerance. A table rather than a JSON blob on `pair`, because the worklist orders by size of difference. | index `pair_id` | TR-401, TR-402, TR-607 |
 | `run_item` | One row per record per run: `state` from the closed set in SPEC §5.6, plus `pair_id`. | unique `(run_id, record_id)` | TR-509, TR-511 |
 | `resolution` | The durable decision. `kind`, `(left_source_id, left_reference)`, `(right_source_id, right_reference)`, `reason`, `author`, `created_at`, `revoked_at`, `revoked_reason`. | index on both identity pairs | TR-508, TR-708 |
 
