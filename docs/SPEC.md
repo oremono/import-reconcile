@@ -106,6 +106,7 @@ Listed explicitly so the boundary is deliberate rather than accidental:
 - **R1.3** A file for a source and period already received, but whose contents differ, is a **correction**. It is accepted as a new version of that period.
 - **R1.4** A file is treated as a **complete restatement** of the period it covers for that source. After a correction is accepted, the correction's rows are the current truth for that source and period. A row present in the earlier version and absent from the correction is marked **withdrawn** and is reported as such rather than vanishing.
 - **R1.5** Rows that fail to load — missing required field, unparseable date, unparseable number — are recorded as **rejected rows** with the reason and the original row content, and are visible to the analyst. A file with rejected rows still loads its valid rows; it does not fail wholesale.
+- **R1.6** A file whose period only partly overlaps a period already loaded for that source is **rejected** with a message naming the conflict. Periods must either match exactly or not overlap at all. A partial restatement cannot be reconciled with R1.4's rule that a file is a complete restatement of its period.
 
 ### 5.2 Normalisation
 
@@ -128,7 +129,7 @@ Matching runs in tiers. Each tier only considers records not already paired by a
 
 - **R4.1 — Carried-forward resolutions.** Before anything else, every manual resolution from previous runs is applied (see §5.7). Records covered by one are already settled.
 - **R4.2 — Reference match.** Records with the same reference on both sides are paired. This is the common case and is applied with confidence.
-- **R4.3 — Suggested match.** For records left unpaired, the system looks for a plausible counterpart: same instrument, same side, quantity equal within quantity tolerance, and timestamp within the suggestion window (**2 hours**). Where exactly one plausible counterpart exists, it is offered as a **suggestion**. Where several exist, they are all offered, ranked by closeness in time and amount.
+- **R4.3 — Suggested match.** For records left unpaired, the system looks for a plausible counterpart: same instrument, same side, quantity equal within quantity tolerance, and timestamp within the suggestion window (**2 hours**). Where exactly one plausible counterpart exists, it is offered as a **suggestion**. Where several exist, they are all offered, ranked by closeness in time and amount. Candidates are drawn only from the two files being reconciled in this run; records left unmatched by earlier runs are not carried into the pool.
 - **R4.4** A suggestion is **never applied automatically.** It is presented for a person to confirm or reject. Rationale: a wrong automatic pairing hides two genuine problems and manufactures a third that looks like a break; leaving them unmatched is a smaller, more visible error.
 - **R4.5** Confirming a suggestion is recorded as a manual match and carries forward exactly like one made from scratch.
 - **R4.6** Rejecting a suggestion is remembered: that specific pair is not suggested again.
@@ -352,6 +353,10 @@ Every judgment call the brief left open, and why it was called that way. This se
 | D16 | Currency? | Single settlement currency assumed across sources; no FX. | Multi-currency needs rate sourcing and a valuation date, which is a separate problem. Stated as an assumption rather than left implicit. |
 | D17 | Timezones? | Held in UTC internally. Each source declares its timezone in configuration; a source sending naive timestamps is interpreted by that declaration. | Guessing per file is how a one-hour reconciliation break gets created twice a year. |
 | D18 | Is there any concept of a user account? | No. Resolutions record an author name entered by the analyst. | Single-user scope; but attribution is still recorded, because "who decided this and why" is the question asked six weeks later. |
+| D19 | Can a counterparty reuse a reference in a later period? | No. A reference identifies one transaction for all time. | True of most venues, whose identifiers are sequential. Keeps the pairing key, every resolution, and every history lookup to a single value. Revisit only if a source is observed restarting its numbering. |
+| D20 | Is there a state for "raised with the counterparty, awaiting reply"? | No. Two resolutions only: pair by hand, or accept no pair. | The brief asks for exactly those two. A third state needs its own ageing and chasing behaviour to be worth anything, and a half-built one is worse than none. Recorded in §10 as the first thing to add next. |
+| D21 | What if a file's period only partly overlaps one already loaded? | Rejected with a message. Exact match or no overlap. | Superseding only the overlap would break the complete-restatement rule (D7) and make withdrawn rows undetectable. A partial delivery is a problem with the delivery, and the analyst should hear about it immediately. |
+| D22 | Which records can a suggestion draw on? | Only the two files in the current run. | Predictable and fast, and the analyst can always pair manually when the counterpart is elsewhere. Carrying unmatched records forward needs a persistent open-items pool and an ageing rule, which is a larger design than the value it adds here. |
 
 ---
 
@@ -374,9 +379,12 @@ Each maps to a flow, is observable without reading code, and doubles as the scri
 
 ---
 
-## 10. Open questions
+## 10. Deliberately deferred
 
-1. **Reference reuse.** Can a counterparty reuse a reference across periods? Assumed no for now; if yes, the pairing key needs a period component.
-2. **Escalation.** Once an analyst decides a break is the counterparty's problem, there is no state for "raised with them, awaiting reply" — it simply stays in the worklist. Worth adding if the worklist starts accumulating long-lived items.
-3. **Partial periods.** Behaviour when a file's stated period only partly overlaps a previous file's is undefined. Currently assumed that periods align exactly.
-4. **How far back do suggestions look?** Candidates are currently sought only within the run's period. A trade booked a day late would not be suggested.
+Nothing in this specification is undecided. These are the things left out on purpose, in the order they are worth adding next. This section is the source for the README's "what I would do next".
+
+1. **An escalated state.** Today a break the analyst has raised with the counterparty stays in the worklist with no way to mark it as chased. The first real user will ask for this within a week. It needs a state, an ageing rule, and a filter (D20).
+2. **Many-to-one matching.** Splits, merges, and netting are real and are declined outright here (D11). They need their own model, not a variation on the pair.
+3. **Carrying unmatched records forward.** A trade booked a day late by one side will never be suggested today (D22). Fixing it means a persistent open-items pool with an ageing rule.
+4. **Multi-currency.** Assumed away (D16). Needs a rate source and a valuation date before it is even a design question.
+5. **Scheduling and notification.** The run is started by a person on purpose (§4). Automating it is easy; deciding who gets told what, and when, is not.
