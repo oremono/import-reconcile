@@ -30,3 +30,6 @@ htmlcov/
 EXECUTION_PLAN.md
 .verify/
 reconcile.db
+
+# Local run artefacts
+.claude/launch.json
