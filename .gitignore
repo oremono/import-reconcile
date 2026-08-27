@@ -25,3 +25,6 @@ htmlcov/
 .idea/
 .DS_Store
 *.swp
+
+# Build process, not part of the deliverable
+EXECUTION_PLAN.md
