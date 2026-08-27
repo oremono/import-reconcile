@@ -11,6 +11,7 @@ How the system is built. Every section names the technical requirements it satis
 | [SPEC.md](SPEC.md) | What the system does, in business terms | `R*.*` requirements, `D*` decisions, `AC*` acceptance criteria |
 | [REQUIREMENTS.md](REQUIREMENTS.md) | What it must do technically, each item checkable | `TR-*` |
 | **DESIGN.md** (this) | How it is built, and why it is built that way | `DD-*` design decisions (§14) |
+| [TRADEOFFS.md](TRADEOFFS.md) | What those decisions cost, and where they break | reversibility, failure modes |
 
 Business rationale lives in `SPEC.md` §8. Technical rationale lives here in §14. Neither is repeated in prose.
 
