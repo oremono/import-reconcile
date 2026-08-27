@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Pair {{ pair.id }} &middot; run #{{ run.id }}{% endblock %}
+{% block nav %}<a href="/runs/{{ run.id }}">Summary</a><a href="/runs/{{ run.id }}/worklist">Worklist</a>{% endblock %}
+{% block body %}
+
+<p class="crumb"><a href="/">Runs</a> / <a href="/runs/{{ run.id }}">#{{ run.id }}</a> /
+  <a href="/runs/{{ run.id }}/worklist">Worklist</a> / pair {{ pair.id }}</p>
+
+<h1><span class="mono">{{ left_record.reference }}</span> against <span class="mono">{{ right_record.reference }}</span></h1>
+<p class="sub">
+  <span class="pill {{ pair.verdict }}">{{ pair.verdict | words }}</span>
+  &nbsp;{{ differing | length }} field{{ '' if differing | length == 1 else 's' }} differ.
+</p>
+
+
+<div class="card">
+  <h3>Where this pair came from</h3>
+  {% if pair.origin == 'reference' %}
+    <p>Matched on reference &mdash; both sides call this trade
+      <span class="mono">{{ left_record.reference }}</span>.</p>
+  {% elif pair.origin == 'manual' %}
+    <p>Paired by hand{% if resolution %} on {{ resolution.created_at | ts }} by
+      <strong>{{ resolution.author }}</strong>: &ldquo;{{ resolution.reason }}&rdquo;{% endif %}.</p>
+    <p class="note">Pairing asserts these are the same transaction, not that they agree. A manual pair
+      that disagrees beyond tolerance is a break, and that is correct.</p>
+  {% else %}
+    <p>Suggested by the matcher and awaiting confirmation. A suggestion is never applied on its own.</p>
+  {% endif %}
+</div>
+
+<h2>Field by field</h2>
+<div class="card">
+  <table>
+    <thead><tr>
+      <th>Field</th>
+      <th>{{ left_source.name if left_source else 'Ours' }}</th>
+      <th>{{ right_source.name if right_source else 'Theirs' }}</th>
+      <th class="num">Absolute difference</th>
+      <th class="num">Relative</th>
+      <th>Verdict</th>
+    </tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr class="{% if not row.differs %}same{% elif row.within_tolerance %}drift{% else %}differs{% endif %}">
+        <td>{{ row.field | words }}</td>
+        <td class="mono">{{ row.left_value | num }}</td>
+        <td class="mono">{{ row.right_value | num }}</td>
+        <td class="num mono">{% if row.abs_diff is not none %}{{ row.abs_diff | dec }}{% if row.field == 'occurred_at' %} s{% endif %}{% else %}&mdash;{% endif %}</td>
+        <td class="num mono">{% if row.rel_diff is not none %}{{ row.rel_diff | pct }}{% else %}&mdash;{% endif %}</td>
+        <td>
+          {% if not row.differs %}<span class="note">agrees</span>
+          {% elif row.within_tolerance %}<span class="pill agreed_with_drift">within tolerance</span>
+          {% else %}<span class="pill break">out of tolerance</span>{% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="empty-state">No compared fields recorded for this pair.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:14px">
+    Instrument, side and status carry no magnitude &mdash; a difference there is a different trade, not a small one,
+    so no absolute or relative figure is shown.
+  </p>
+</div>
+
+<h2>What now</h2>
+<div class="card">
+  <p class="sub">
+    Either this is a real discrepancy to take up with the counterparty &mdash; leave it, it stays on the worklist &mdash;
+    or the pairing itself was wrong.
+  </p>
+  <div class="actions">
+    <a href="/records/{{ left_source.code if left_source else '' }}/{{ left_record.reference }}/history">History of our row</a>
+    <a href="/records/{{ right_source.code if right_source else '' }}/{{ right_record.reference }}/history">History of their row</a>
+    <a href="/runs/{{ run.id }}/worklist">Back to the worklist</a>
+  </div>
+  {% if pair.origin == 'suggested' %}
+  <form class="stack" method="post" action="/resolutions" style="margin-top:18px">
+    <input type="hidden" name="kind" value="reject_suggestion">
+    <input type="hidden" name="left_source" value="{{ left_source.code if left_source else '' }}">
+    <input type="hidden" name="left_reference" value="{{ left_record.reference }}">
+    <input type="hidden" name="right_source" value="{{ right_source.code if right_source else '' }}">
+    <input type="hidden" name="right_reference" value="{{ right_record.reference }}">
+    <input type="hidden" name="return_to" value="/runs/{{ run.id }}/worklist">
+    <div class="row">
+      <label><span>Reason</span><input type="text" name="reason" required placeholder="Why these are not the same trade"></label>
+      <label><span>Your name</span><input type="text" name="author" required placeholder="Who is deciding"></label>
+    </div>
+    <div class="actions"><button class="danger" type="submit">These are not the same trade</button></div>
+  </form>
+  {% endif %}
+</div>
+
+{% endblock %}

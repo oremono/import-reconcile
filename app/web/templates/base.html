@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Reconciliation{% endblock %}</title>
+<style>
+/* One stylesheet, inlined. No framework, no build step, no script tag. TR-601. */
+:root {
+  --ink: #16191d;
+  --ink-soft: #5c6672;
+  --ink-faint: #8b95a1;
+  --line: #dfe3e8;
+  --line-soft: #eef1f4;
+  --page: #f6f7f9;
+  --card: #ffffff;
+  --focus: #1d4ed8;
+  --alarm: #b42318;
+  --alarm-bg: #fef3f2;
+  --warn: #b54708;
+  --warn-bg: #fffaeb;
+  --calm: #067647;
+  --calm-bg: #ecfdf3;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+a { color: var(--focus); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 72px; }
+
+header.top {
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 28px;
+}
+header.top .wrap { display: flex; align-items: baseline; gap: 20px; padding-top: 16px; padding-bottom: 16px; }
+header.top .mark { font-weight: 650; letter-spacing: -0.01em; }
+header.top nav { margin-left: auto; display: flex; gap: 18px; font-size: 14px; }
+
+h1 { font-size: 24px; letter-spacing: -0.02em; margin: 0 0 4px; }
+h2 { font-size: 16px; margin: 32px 0 12px; letter-spacing: -0.01em; }
+h3 { font-size: 14px; margin: 0 0 10px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
+p.sub { color: var(--ink-soft); margin: 0 0 20px; }
+.crumb { font-size: 13px; color: var(--ink-faint); margin: 0 0 14px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.card.quiet { background: transparent; border-style: dashed; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-weight: 600; color: var(--ink-soft); font-size: 12px;
+     text-transform: uppercase; letter-spacing: 0.05em; padding: 0 10px 8px 0;
+     border-bottom: 1px solid var(--line); }
+td { padding: 10px 10px 10px 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 0; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+
+/* The one number that matters. SPEC 6.2. */
+.headline { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.headline .count { font-size: 64px; line-height: 1; font-weight: 680; letter-spacing: -0.04em; }
+.headline .count.zero { color: var(--calm); }
+.headline .count.work { color: var(--alarm); }
+.headline .label { padding-bottom: 8px; color: var(--ink-soft); max-width: 34ch; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: var(--card); }
+.tile .n { font-size: 26px; font-weight: 640; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tile .k { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+.tile.focus { border-color: #f4c7c3; background: var(--alarm-bg); }
+.tile.focus .n { color: var(--alarm); }
+.tile.empty { opacity: 0.55; }
+.tiles.context .tile { background: transparent; border-color: var(--line-soft); }
+.tiles.context .n { font-size: 20px; font-weight: 560; color: var(--ink-soft); }
+
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px;
+        border: 1px solid var(--line); color: var(--ink-soft); background: var(--card); white-space: nowrap; }
+.pill.break, .pill.status_disagreement { background: var(--alarm-bg); border-color: #f4c7c3; color: var(--alarm); }
+.pill.suggested, .pill.unmatched, .pill.withdrawn, .pill.rejected_row { background: var(--warn-bg); border-color: #f3d38a; color: var(--warn); }
+.pill.agreed, .pill.agreed_with_drift, .pill.accepted_unmatched { background: var(--calm-bg); border-color: #b7ebc9; color: var(--calm); }
+
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.filters a { border: 1px solid var(--line); background: var(--card); border-radius: 999px;
+             padding: 5px 12px; font-size: 13px; color: var(--ink-soft); text-decoration: none; }
+.filters a.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.filters .sep { color: var(--ink-faint); font-size: 12px; margin-left: 8px; }
+
+form.stack { display: grid; gap: 12px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > label { flex: 1 1 180px; }
+label { display: block; font-size: 13px; color: var(--ink-soft); }
+label > span { display: block; margin-bottom: 4px; }
+input, select, textarea {
+  width: 100%; font: inherit; font-size: 14px; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
+button {
+  font: inherit; font-size: 14px; font-weight: 550; padding: 9px 16px; border-radius: 6px;
+  border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer;
+}
+button.secondary { background: var(--card); color: var(--ink); border-color: var(--line); }
+button.danger { background: var(--card); color: var(--alarm); border-color: #f4c7c3; }
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.flash { border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; border: 1px solid; font-size: 14px; }
+.flash.info { background: var(--card); border-color: var(--line); }
+.flash.success { background: var(--calm-bg); border-color: #b7ebc9; color: var(--calm); }
+.flash.error { background: var(--alarm-bg); border-color: #f4c7c3; color: var(--alarm); }
+
+.note { font-size: 13px; color: var(--ink-faint); }
+.missing { background: var(--warn-bg); border: 1px dashed #f3d38a; color: var(--warn);
+           border-radius: 8px; padding: 12px 16px; font-size: 14px; margin-bottom: 20px; }
+
+/* Break detail. Agreement is quiet; disagreement is not. */
+tr.same td { color: var(--ink-faint); }
+tr.differs td { background: var(--alarm-bg); }
+tr.differs td:first-child { font-weight: 600; }
+tr.drift td { background: var(--warn-bg); }
+.empty-state { color: var(--ink-soft); padding: 24px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <span class="mark">Reconciliation</span>
+    <nav>
+      <a href="/">Home</a>
+      {% block nav %}{% endblock %}
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+{% if flash %}<div class="flash {{ flash.level }}">{{ flash.text }}</div>{% endif %}
+{% block body %}{% endblock %}
+</main>
+</body>
+</html>

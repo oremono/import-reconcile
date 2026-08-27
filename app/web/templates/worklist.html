@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Worklist &middot; run #{{ run.id }}{% endblock %}
+{% block nav %}<a href="/runs/{{ run.id }}">Summary</a>{% endblock %}
+{% block body %}
+
+<p class="crumb"><a href="/">Runs</a> / <a href="/runs/{{ run.id }}">#{{ run.id }}</a> / Worklist</p>
+<h1>Worklist</h1>
+<p class="sub">
+  {{ lines | length }} decision{{ '' if lines | length == 1 else 's' }} waiting, largest difference first.
+  {% if records_total != lines | length %}
+  <span class="note">({{ records_total }} records: the two sides of a pair are one decision, not two.)</span>
+  {% endif %}
+</p>
+{% if rejected_rows %}
+<p class="note">{{ rejected_rows }} of those are rows that could not be read at all. They have no record to open &mdash;
+  they are listed under the file that carried them on the <a href="/">home page</a>.</p>
+{% endif %}
+
+
+<div class="filters">
+  <a href="/runs/{{ run.id }}/worklist?sort={{ sort }}" class="{{ 'on' if not state }}">All</a>
+  {% for value, count in states %}
+    <a href="/runs/{{ run.id }}/worklist?state={{ value }}&amp;sort={{ sort }}"
+       class="{{ 'on' if state == value }}">{{ value | words }} ({{ count }})</a>
+  {% endfor %}
+  <span class="sep">Sort by</span>
+  {% for value, label in sorts.items() %}
+    <a href="/runs/{{ run.id }}/worklist?{% if state %}state={{ state }}&amp;{% endif %}sort={{ value }}"
+       class="{{ 'on' if sort == value }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% if lines %}
+<div class="card">
+  <table>
+    <thead><tr>
+      <th>Reference</th><th>Instrument</th><th>State</th><th>Difference</th>
+      <th class="num">Relative</th><th class="num">At stake</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for line in lines %}
+      <tr data-records="{{ line.record_ids | join(',') }}">
+        <td class="mono"><a href="{{ line.href }}">{{ line.record.reference }}</a>{%
+          if line.counterpart and line.counterpart.reference != line.record.reference
+          %} <span class="note">/ {{ line.counterpart.reference }}</span>{% endif %}</td>
+        <td>{{ line.record.instrument }} <span class="note">{{ line.record.side }}</span></td>
+        <td><span class="pill {{ line.state }}">{{ line.state | words }}</span></td>
+        <td>{{ line.headline }}</td>
+        <td class="num" data-relative="{{ line.relative_size }}">{% if line.relative_size %}{{ line.relative_size | pct }}{% else %}&mdash;{% endif %}</td>
+        <td class="num mono" data-absolute="{{ line.absolute_size }}">{{ line.absolute_size | dec }}</td>
+        <td><a href="{{ line.href }}">Open</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card quiet">
+  <p class="empty-state">
+    {% if state %}Nothing in state &ldquo;{{ state | words }}&rdquo;.{% else %}Nothing needs a decision.{% endif %}
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}

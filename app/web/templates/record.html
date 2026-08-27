@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}{{ record.reference }} &middot; run #{{ run.id }}{% endblock %}
+{% block nav %}<a href="/runs/{{ run.id }}">Summary</a><a href="/runs/{{ run.id }}/worklist">Worklist</a>{% endblock %}
+{% block body %}
+
+{% set this_code = this_source.code if this_source else '' %}
+{% set other_code = other_source.code if other_source else '' %}
+{% set left_code = left_source.code if left_source else '' %}
+{% set right_code = right_source.code if right_source else '' %}
+
+<p class="crumb"><a href="/">Runs</a> / <a href="/runs/{{ run.id }}">#{{ run.id }}</a> /
+  <a href="/runs/{{ run.id }}/worklist">Worklist</a> / {{ record.reference }}</p>
+
+<h1><span class="mono">{{ record.reference }}</span></h1>
+<p class="sub">
+  {% if item %}<span class="pill {{ item.state }}">{{ item.state | words }}</span>&nbsp;{% endif %}
+  From {{ this_source.name if this_source else '?' }}.
+  {% if item and item.state == 'suggested' %}
+    A counterpart in {{ other_source.name if other_source else 'the other source' }} looks plausible,
+    but nothing has been paired &mdash; a suggestion is never applied on its own.
+  {% else %}
+    No counterpart found in {{ other_source.name if other_source else 'the other source' }}.
+  {% endif %}
+</p>
+
+
+<div class="card">
+  <h3>The record</h3>
+  <table>
+    <tbody>
+      <tr><td>reference</td><td class="mono">{{ record.reference }}</td></tr>
+      <tr><td>occurred at</td><td class="mono">{{ record.occurred_at | ts }}</td></tr>
+      <tr><td>instrument</td><td class="mono">{{ record.instrument }}</td></tr>
+      <tr><td>side</td><td class="mono">{{ record.side }}</td></tr>
+      <tr><td>quantity</td><td class="mono">{{ record.quantity | dec }}</td></tr>
+      <tr><td>unit price</td><td class="mono">{{ record.unit_price | dec }}</td></tr>
+      <tr><td>gross amount</td><td class="mono">{{ record.gross_amount | dec }}</td></tr>
+      <tr><td>status</td><td class="mono">{{ record.status }}{% if record.is_cancelled %} (cancelled){% endif %}</td></tr>
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:14px">
+    <a href="/records/{{ this_code }}/{{ record.reference }}/history">Value history across file versions</a>
+  </p>
+</div>
+
+<h2>Plausible counterparts</h2>
+<p class="sub">
+  Ranked from {{ other_source.name if other_source else 'the other side' }}. A candidate is offered, never applied &mdash;
+  confirming one is a decision, with a reason, that every future run honours.
+</p>
+
+{% if candidates %}
+{% for candidate, why in candidates %}
+{% set cand_left = record.reference if on_left else candidate.reference %}
+{% set cand_right = candidate.reference if on_left else record.reference %}
+<div class="card">
+  <div class="row" style="align-items:baseline; gap:16px">
+    <div style="flex:0 0 auto"><span class="pill">#{{ loop.index }}</span></div>
+    <div style="flex:1 1 260px">
+      <div class="mono" style="font-size:15px"><strong>{{ candidate.reference }}</strong></div>
+      <div class="note">{{ candidate.instrument }} {{ candidate.side }} &middot;
+        {{ candidate.quantity | dec }} @ {{ candidate.unit_price | dec }} =
+        {{ candidate.gross_amount | dec }} &middot; {{ candidate.occurred_at | ts }}</div>
+    </div>
+    <div style="flex:1 1 240px"><strong>Why it qualifies:</strong> {{ why }}</div>
+  </div>
+
+  <form class="stack" method="post" action="/resolutions" style="margin-top:14px">
+    <input type="hidden" name="kind" value="manual_match">
+    <input type="hidden" name="left_source" value="{{ left_code }}">
+    <input type="hidden" name="left_reference" value="{{ cand_left }}">
+    <input type="hidden" name="right_source" value="{{ right_code }}">
+    <input type="hidden" name="right_reference" value="{{ cand_right }}">
+    <input type="hidden" name="return_to" value="{{ return_to }}">
+    <div class="row">
+      <label><span>Reason</span><input type="text" name="reason" required
+        placeholder="Why these are the same transaction"></label>
+      <label><span>Your name</span><input type="text" name="author" required placeholder="Who is deciding"></label>
+    </div>
+    <div class="actions">
+      <button type="submit">Confirm this is the counterpart</button>
+      <span class="note">Pairing them does not assert they agree. If the values differ beyond tolerance it becomes a break.</span>
+    </div>
+  </form>
+
+  <form class="stack" method="post" action="/resolutions" style="margin-top:10px">
+    <input type="hidden" name="kind" value="reject_suggestion">
+    <input type="hidden" name="left_source" value="{{ left_code }}">
+    <input type="hidden" name="left_reference" value="{{ cand_left }}">
+    <input type="hidden" name="right_source" value="{{ right_code }}">
+    <input type="hidden" name="right_reference" value="{{ cand_right }}">
+    <input type="hidden" name="return_to" value="{{ return_to }}">
+    <div class="row">
+      <label><span>Reason</span><input type="text" name="reason" required placeholder="Why it is not this one"></label>
+      <label><span>Your name</span><input type="text" name="author" required></label>
+    </div>
+    <div class="actions"><button class="danger" type="submit">Not this one &mdash; stop suggesting it</button></div>
+  </form>
+</div>
+{% endfor %}
+{% else %}
+<div class="card quiet">
+  <p class="empty-state">
+    No candidate on the other side is close enough on instrument, side, quantity and time to be worth offering.
+  </p>
+</div>
+{% endif %}
+
+<h2>Pair with a record not listed above</h2>
+<div class="card">
+  <form class="stack" method="post" action="/resolutions">
+    <input type="hidden" name="kind" value="manual_match">
+    <input type="hidden" name="left_source" value="{{ left_code }}">
+    <input type="hidden" name="right_source" value="{{ right_code }}">
+    <input type="hidden" name="return_to" value="{{ return_to }}">
+    {% if on_left %}
+      <input type="hidden" name="left_reference" value="{{ record.reference }}">
+      <label><span>Their reference</span><input type="text" name="right_reference" required
+        placeholder="Reference in {{ other_source.name if other_source else 'the other source' }}"></label>
+    {% else %}
+      <input type="hidden" name="right_reference" value="{{ record.reference }}">
+      <label><span>Our reference</span><input type="text" name="left_reference" required
+        placeholder="Reference in {{ other_source.name if other_source else 'the other source' }}"></label>
+    {% endif %}
+    <div class="row">
+      <label><span>Reason</span><input type="text" name="reason" required
+        placeholder="Why these are the same transaction"></label>
+      <label><span>Your name</span><input type="text" name="author" required></label>
+    </div>
+    <div class="actions"><button type="submit">Pair them</button></div>
+  </form>
+</div>
+
+<h2>Or accept that there is no counterpart</h2>
+<div class="card">
+  <p class="sub">
+    It leaves the worklist today and does not come back &mdash; unless a later correction produces a genuine
+    counterpart, in which case this acceptance is revoked automatically and you are told.
+  </p>
+  <form class="stack" method="post" action="/resolutions">
+    <input type="hidden" name="kind" value="accept_unmatched">
+    <input type="hidden" name="left_source" value="{{ this_code }}">
+    <input type="hidden" name="left_reference" value="{{ record.reference }}">
+    <input type="hidden" name="return_to" value="{{ return_to }}">
+    <div class="row">
+      <label><span>Reason</span><input type="text" name="reason" required
+        placeholder="How you established there is no counterpart"></label>
+      <label><span>Your name</span><input type="text" name="author" required></label>
+    </div>
+    <div class="actions"><button class="secondary" type="submit">Accept as having no counterpart</button></div>
+  </form>
+</div>
+
+{% endblock %}

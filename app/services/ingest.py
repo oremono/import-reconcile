@@ -25,6 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import FileBatch, Record, RejectedRow, Source
+from app.observability import log_ingest
 from core.format import source_format_from_config
 from core.model import NormalizedRecord, RowError
 from core.normalize import HeaderError, normalize_rows
@@ -234,7 +235,7 @@ def ingest_file(
         )
 
     session.flush()
-    return IngestResult(
+    result = IngestResult(
         batch_id=batch.id,
         source_code=source.code,
         version_no=version_no,
@@ -243,6 +244,21 @@ def ingest_file(
         superseded_batch_id=previous.id if previous else None,
         withdrawn_references=withdrawn,
     )
+    # TR-706. What arrived, for which period, as which version, and what it
+    # cost. Emitted only on the path that actually wrote something: a refusal
+    # raises above this line and leaves no trace, which is the point.
+    log_ingest(
+        source=result.source_code,
+        period_start=period_start,
+        period_end=period_end,
+        version=result.version_no,
+        batch_id=result.batch_id,
+        accepted_rows=result.accepted_rows,
+        rejected_rows=result.rejected_rows,
+        withdrawn=len(result.withdrawn_references),
+        superseded_batch_id=result.superseded_batch_id,
+    )
+    return result
 
 
 def _persist_records(

@@ -171,7 +171,7 @@ Every record ends a run in exactly one state.
 | **Status disagreement** | A counterpart exists but is cancelled on one side and live on the other. | **Yes** |
 | **Accepted unmatched** | No counterpart, and a person has accepted that this is genuine. | No |
 | **Withdrawn** | Present in an earlier version of the period, absent from the current one. | **Yes** |
-| **Rejected row** | Could not be loaded. | **Yes** |
+| **Rejected row** | Could not be loaded. Counted in the worklist total, but listed under the file that carried it rather than as an item to open. | **Yes** |
 
 The **worklist** is precisely the states marked yes. "Done for today" is an empty worklist.
 
@@ -358,6 +358,7 @@ Every judgment call the brief left open, and why it was called that way. This se
 | D20 | Is there a state for "raised with the counterparty, awaiting reply"? | No. Two resolutions only: pair by hand, or accept no pair. | The brief asks for exactly those two. A third state needs its own ageing and chasing behaviour to be worth anything, and a half-built one is worse than none. Recorded in §10 as the first thing to add next. |
 | D21 | What if a file's period only partly overlaps one already loaded? | Rejected with a message. Exact match or no overlap. | Superseding only the overlap would break the complete-restatement rule (D7) and make withdrawn rows undetectable. A partial delivery is a problem with the delivery, and the analyst should hear about it immediately. |
 | D22 | Which records can a suggestion draw on? | Only the two files in the current run. | Predictable and fast, and the analyst can always pair manually when the counterpart is elsewhere. Carrying unmatched records forward needs a persistent open-items pool and an ageing rule, which is a larger design than the value it adds here. |
+| D24 | A rejected row needs a person, but has no record to open. Where does it live? | Counted in the worklist total, listed under its file rather than as a worklist item. | A rejected row never became a record, so there is nothing to pair, compare, or resolve - the action is to fix the file, not to reconcile it. Counting it keeps the analyst from reaching an empty worklist while two rows silently never loaded; listing it under its file puts it where the fix is. Surfaced while building the run summary. |
 | D23 | Is a one-sided cancellation its own outcome state, or a flavour of unmatched? | Its own state, `status disagreement`. | R3.4 requires the summary to distinguish it, and a summary built from one state per record (R5.6) cannot distinguish what is not a state. Folding it into unmatched would hide a genuinely serious break - one party cancelled a trade and the other did not - among ordinary missing rows. Surfaced while building the schema. |
 
 ---

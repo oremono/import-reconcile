@@ -241,7 +241,42 @@ def main() -> None:
     write(DATA / f"statement_{PERIOD}_v2.csv", corrected)
     print(f"  correction: {fixed} amounts fixed, {withdrawn['reference']} withdrawn")
 
+    # A second correction, this one ADDING a row rather than changing one.
+    # Without it the auto-revocation rule (SPEC R7.7, D10) cannot be shown from
+    # shipped data at all: revocation fires when a correction supplies a
+    # counterpart for a record someone already accepted as having no pair, and
+    # no other sample file adds anything.
+    supplied = _supply_a_counterpart(ledger, corrected)
+    write(DATA / f"statement_{PERIOD}_v3.csv", supplied)
+    print("  second correction: adds the counterparty's booking of T-1012")
+
     write(DATA / f"venue_c_{PERIOD}.csv", venue_c)
+
+
+def _supply_a_counterpart(ledger: list[dict], corrected: list[dict]) -> list[dict]:
+    """Return the corrected statement plus the counterparty's version of T-1012.
+
+    T-1012 is on our books and on no statement, so an analyst working the
+    worklist would reasonably accept it as having no pair. When the counterparty
+    later books it, that honest decision was made on incomplete information and
+    must not survive.
+    """
+    ours = next(r for r in ledger if r["trade_id"] == "T-1012")
+    booked_at = datetime.strptime(ours["traded_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    return [
+        *corrected,
+        {
+            "reference": ours["trade_id"],
+            "executed_at": booked_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "symbol": ours["instrument"],
+            "direction": "B" if ours["side"] == "BUY" else "S",
+            "qty": _trim(ours["quantity"]),
+            "unit_price": _trim(ours["price"]),
+            "total": ours["gross_amount"],
+            "status": "SETTLED",
+            "_case": "late_booking",
+        },
+    ]
 
 
 if __name__ == "__main__":

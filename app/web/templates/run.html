@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Run #{{ run.id }}{% endblock %}
+{% block nav %}<a href="/runs/{{ run.id }}/worklist">Worklist</a>{% endblock %}
+{% block body %}
+
+<p class="crumb"><a href="/">Runs</a> / #{{ run.id }}</p>
+<h1>Run #{{ run.id }}</h1>
+<p class="sub">
+  {{ left.name if left else '?' }} against {{ right.name if right else '?' }},
+  <span class="mono">{{ run.period_start }}</span> to <span class="mono">{{ run.period_end }}</span>.
+  Started {{ run.started_at | ts }}.
+</p>
+
+<div class="card">
+  <div class="headline">
+    <div class="count {{ 'work' if worklist_total else 'zero' }}">{{ worklist_total }}</div>
+    <div class="label">
+      {% if worklist_total %}
+        items need a decision.
+        <a href="/runs/{{ run.id }}/worklist">Open the worklist</a>, largest difference first.
+      {% else %}
+        Nothing needs a decision. Every record read is accounted for.
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<h2>Needs attention</h2>
+<div class="tiles">
+  {% for state, count in focus_states %}
+    {% if count or state in ('break', 'suggested', 'unmatched') %}
+    <a class="tile {{ 'focus' if count else 'empty' }}" href="/runs/{{ run.id }}/worklist?state={{ state }}"
+       style="text-decoration:none; color:inherit; display:block">
+      <div class="n">{{ count }}</div>
+      <div class="k">{{ state | words }}</div>
+      {% if state == 'unmatched' and unmatched_by_side %}
+      <div class="note" style="margin-top:6px">
+        {% for side, n in unmatched_by_side.items() %}{{ n }} {{ 'ours' if side == 'left' else 'theirs' }}{% if not loop.last %}, {% endif %}{% endfor %}
+      </div>
+      {% endif %}
+    </a>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<h2>Context</h2>
+<div class="tiles context">
+  {% for state, count in context_states %}
+    <div class="tile"><div class="n">{{ count }}</div><div class="k">{{ state | words }}</div></div>
+  {% endfor %}
+  {% for side, total in side_totals.items() %}
+    <div class="tile"><div class="n">{{ total }}</div><div class="k">read &mdash; {{ 'ours' if side == 'left' else 'theirs' }}</div></div>
+  {% endfor %}
+</div>
+
+{% endblock %}

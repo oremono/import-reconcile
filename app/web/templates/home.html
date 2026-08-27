@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Reconciliation{% endblock %}
+{% block body %}
+
+<h1>Reconciliation</h1>
+<p class="sub">Load a file, then run our ledger against a counterparty statement for a period.</p>
+
+{% if not sources %}
+<div class="missing">
+  No sources are configured yet. Run <span class="mono">uv run python -m app.seed</span> once, then reload this page.
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Load a file</h3>
+  <form class="stack" method="post" action="/files" enctype="multipart/form-data">
+    <div class="row">
+      <label><span>Source</span>
+        <select name="source" required>
+          {% for source in sources %}<option value="{{ source.code }}">{{ source.name }} ({{ source.code }})</option>{% endfor %}
+        </select>
+      </label>
+      <label><span>Period start</span>
+        <input type="date" name="period_start" value="{{ period_start }}" required></label>
+      <label><span>Period end</span>
+        <input type="date" name="period_end" value="{{ period_end }}" required></label>
+    </div>
+    <label><span>CSV file</span><input type="file" name="upload" accept=".csv,text/csv" required></label>
+    <div class="actions">
+      <button type="submit">Load file</button>
+      <span class="note">A byte-identical resend is refused. A file restating a period already loaded is accepted as a correction.</span>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Start a run</h3>
+  <form class="stack" method="post" action="/runs">
+    <div class="row">
+      <label><span>Ours</span>
+        <select name="left_source" required>
+          {% for source in sources %}<option value="{{ source.code }}" {% if source.code == 'ledger' %}selected{% endif %}>{{ source.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label><span>Theirs</span>
+        <select name="right_source" required>
+          {% for source in sources %}<option value="{{ source.code }}" {% if source.code == 'statement' %}selected{% endif %}>{{ source.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label><span>Period start</span><input type="date" name="period_start" value="{{ period_start }}" required></label>
+      <label><span>Period end</span><input type="date" name="period_end" value="{{ period_end }}" required></label>
+    </div>
+    <div class="actions"><button type="submit">Run reconciliation</button></div>
+  </form>
+</div>
+
+<h2>Runs</h2>
+{% if runs %}
+<div class="card">
+  <table>
+    <thead><tr>
+      <th>Run</th><th>Sources</th><th>Period</th><th>Started</th>
+      <th class="num">Needs attention</th><th class="num">Breaks</th><th class="num">Agreed</th>
+    </tr></thead>
+    <tbody>
+    {% for line in runs %}
+      <tr>
+        <td><a href="/runs/{{ line.run.id }}">#{{ line.run.id }}</a></td>
+        <td>{{ line.left }} &rarr; {{ line.right }}</td>
+        <td class="mono">{{ line.run.period_start }} &ndash; {{ line.run.period_end }}</td>
+        <td class="note">{{ line.run.started_at | ts }}</td>
+        <td class="num">{% if line.worklist_total %}<a href="/runs/{{ line.run.id }}/worklist"><strong>{{ line.worklist_total }}</strong></a>{% else %}0{% endif %}</td>
+        <td class="num">{{ line.breaks }}</td>
+        <td class="num">{{ line.agreed }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card quiet"><p class="empty-state">No runs yet. Load both sides of a period, then start a run.</p></div>
+{% endif %}
+
+<h2>Files accepted</h2>
+{% if batches %}
+<div class="card">
+  <table>
+    <thead><tr>
+      <th>Source</th><th>File</th><th>Period</th><th class="num">Version</th>
+      <th class="num">Rows</th><th class="num">Rejected rows</th><th>Standing</th><th>Accepted</th>
+    </tr></thead>
+    <tbody>
+    {% for line in batches %}
+      <tr>
+        <td class="mono">{{ source_names.get(line.batch.source_id, '?') }}</td>
+        <td>{{ line.batch.filename }}</td>
+        <td class="mono">{{ line.batch.period_start }} &ndash; {{ line.batch.period_end }}</td>
+        <td class="num">v{{ line.batch.version_no }}</td>
+        <td class="num">{{ line.batch.row_count }}</td>
+        <td class="num">
+          {% if line.batch.rejected_count %}<span class="pill unmatched">{{ line.batch.rejected_count }}</span>{% else %}0{% endif %}
+        </td>
+        <td>
+          {% if line.is_current %}<span class="pill agreed">current</span>
+          {% else %}<span class="pill">superseded{% if line.superseded_by_version %} by v{{ line.superseded_by_version }}{% endif %}</span>{% endif %}
+        </td>
+        <td class="note">{{ line.batch.accepted_at | ts }}</td>
+      </tr>
+      {% for row in line.rejected_rows %}
+      <tr class="same"><td></td><td colspan="7" class="note">row {{ row.row_no }} rejected &mdash; {{ row.reason }}</td></tr>
+      {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:14px">A resend of a file already accepted is refused outright and leaves no row here &mdash; the refusal appears as a message at the top of this page.</p>
+</div>
+{% else %}
+<div class="card quiet"><p class="empty-state">No files loaded yet.</p></div>
+{% endif %}
+
+{% endblock %}

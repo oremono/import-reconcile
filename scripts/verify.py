@@ -100,8 +100,14 @@ def passed_tests() -> set[str]:
             continue
         classname, name = case.get("classname", ""), case.get("name", "")
         module = classname.split(".")[-1] if classname else ""
-        if module:
-            out.add(f"{module}.py::{name}")
+        if not module:
+            continue
+        out.add(f"{module}.py::{name}")
+        # A parametrised test runs as `test_x[case]`. The requirements document
+        # names the function, so record the bare name too - otherwise a
+        # requirement proven eight times over reports as unverified.
+        base = name.split("[", 1)[0]
+        out.add(f"{module}.py::{base}")
     return out
 
 
@@ -198,11 +204,41 @@ def tail_of(proc: subprocess.CompletedProcess[str]) -> str:
 
 
 def stage_routes() -> Stage:
+    """Boot the app against a throwaway database and actually request a page.
+
+    Counting ``app.routes`` proves nothing: some FastAPI versions keep an
+    included router as a single nested object, and a registered route can still
+    raise on its first request. This asks the application for the page an
+    analyst opens first.
+    """
     main = ROOT / "app" / "main.py"
     if not main.exists():
         return Stage("8  route smoke", False, "app/main.py not built yet", skipped=True)
-    r = run(["uv", "run", "python", "-c", "from app.main import app; print(len(app.routes))"])
-    return Stage("8  route smoke", r.returncode == 0, r.stdout.strip() or tail_of(r))
+
+    script = (
+        "import tempfile, os, pathlib\n"
+        "tmp = pathlib.Path(tempfile.mkdtemp()) / 'smoke.db'\n"
+        "os.environ['DATABASE_URL'] = f'sqlite:///{tmp}'\n"
+        "from alembic import command\n"
+        "from alembic.config import Config\n"
+        "cfg = Config('alembic.ini'); command.upgrade(cfg, 'head')\n"
+        "from app.db.session import get_session\n"
+        "from app.seed import seed\n"
+        "import io, contextlib\n"
+        "with contextlib.redirect_stdout(io.StringIO()):\n"
+        "    with get_session() as s: seed(s)\n"
+        "from fastapi.testclient import TestClient\n"
+        "from app.main import app\n"
+        "with TestClient(app) as c:\n"
+        "    r = c.get('/')\n"
+        "    assert r.status_code == 200, r.status_code\n"
+        "print('home page 200')\n"
+    )
+    result = run(["uv", "run", "python", "-c", script])
+    detail = (
+        result.stdout.strip() or tail_of(result) or (result.stderr.strip().splitlines() or [""])[-1]
+    )
+    return Stage("8  route smoke", result.returncode == 0, detail)
 
 
 # ---------------------------------------------------------------------------

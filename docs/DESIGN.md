@@ -100,7 +100,7 @@ Ten tables. The migration is the authority; this is the intent. Several requirem
 | `run_item` | One row per record per run: `state` from the closed set in SPEC §5.6, plus `pair_id`. | unique `(run_id, record_id)` | TR-509, TR-511 |
 | `resolution` | The durable decision. `kind`, `(left_source_id, left_reference)`, `(right_source_id, right_reference)`, `reason`, `author`, `created_at`, `revoked_at`, `revoked_reason`. | index on both identity pairs | TR-508, TR-708 |
 
-`run_item` is what makes the summary a single `GROUP BY` and the worklist a single indexed query. It is also what makes acceptance criterion 2 mechanically true: every record read lands in exactly one row with exactly one state, so the counts cannot fail to add up.
+`run_item` makes the worklist a single indexed query, and makes "every record is in exactly one state" a property of the schema rather than a convention. The summary itself is read from `run.counts`, not recomputed by a `GROUP BY`: TR-512 requires comparing two runs without re-reading either one's items, and the count of rejected rows has no `run_item` to be grouped (D24). It is also what makes acceptance criterion 2 mechanically true: every record read lands in exactly one row with exactly one state, so the counts cannot fail to add up.
 
 ---
 
@@ -336,4 +336,7 @@ The technical counterpart to `SPEC.md` §8. Each is a call that could reasonably
 | DD-9 | Bucketed candidate search by `(instrument, side)` | Keeps tier 3 near-linear without an index structure or a similarity library | Full cross-product: fine at 40 rows, quadratic at 40,000 |
 | DD-10 | `run_item` as the single per-record state table | Makes "every record is in exactly one state" a schema property, and the summary one query | Deriving state by joining `pair` and `record` at render time |
 | DD-11 | Sync SQLAlchemy | Nothing here is IO-bound enough to justify async colouring every function | Async: matches the reference stack, but buys nothing for a batch tool |
+| DD-13 | Derived magnitudes (`max_rel_diff`, `field_diff.rel_diff`) are rounded to the column's scale before storage | They are quotients, so usually non-terminating; `ExactDecimal` correctly refuses to round silently, and something must decide. Both are magnitudes for ordering and display, and the exact figures sit on the same row as `left_value` and `right_value` | Widening the column: pushes the same choice one decimal place further out and still has to stop somewhere |
+| DD-14 | Bulk inserts of `pair` and `field_diff` go through Core, not the ORM | Neither table needs an identity back, so the unit of work is pure cost. Measured: 7.9s to 3.0s for ten thousand records a side | ORM inserts throughout: more uniform, and two and a half times slower on the one path that has a stated budget |
+| DD-15 | The worklist orders by `(max_rel_diff IS NULL) ASC, max_rel_diff DESC` | SQLite and Postgres disagree about where NULLs sort under DESC, and TR-704 forbids asking which backend is in play | Naming the dialect and using its NULLS LAST syntax |
 | DD-12 | Alembic from the first commit | The schema is a deliverable and a reviewer will read its history | `create_all`: faster to start, discards the evolution the brief says it reviews |
