@@ -75,7 +75,7 @@ Numbering is grouped in hundreds so items can be inserted later without renumber
 | TR-408 | Instrument, side, and status compare by exact equality after vocabulary mapping. No tolerance applies to them. | R5.5 | `test_compare.py::test_exact_fields` |
 | TR-409 | Verdict is `break` when any field is out of tolerance, `agreed_with_drift` when all are within tolerance and at least one is non-zero, and `agreed` otherwise. | R5.1, R5.2, R5.6 | `test_compare.py::test_verdicts` |
 | TR-410 | Comparison designates no authoritative side. The output carries both values and a signed difference, never a winner. | D12 | `test_compare.py::test_no_authoritative_side` |
-| TR-411 | The tolerance profile carries independent thresholds for amount, price, quantity, and time, each separately configurable. | D1, D2, D3, D13 | `test_config.py::test_profile_fields` |
+| TR-411 | The tolerance profile carries independent thresholds for amount, price, quantity, and time, each separately configurable. | D1, D2, D3, D13 | `test_tolerance.py::test_profile_fields` |
 
 ---
 
@@ -86,10 +86,10 @@ Numbering is grouped in hundreds so items can be inserted later without renumber
 | TR-501 | Record rows are never updated or deleted. A correction writes new rows under a new batch. | R8.1, R8.2 | `test_corrections.py`; `test_boundaries.py::test_no_record_update` |
 | TR-502 | Run rows are append-only. A re-run creates a new run rather than overwriting one. | R8.1 | `test_reconcile.py::test_runs_append_only` |
 | TR-503 | Unique constraint on `(source_id, content_hash)`. | R1.2 | migration |
-| TR-504 | Unique constraints on `(run_id, left_record_id)` and `(run_id, right_record_id)`. | R4.8 | migration; `test_pair_uniqueness` |
+| TR-504 | Unique constraints on `(run_id, left_record_id)` and `(run_id, right_record_id)`. | R4.8 | migration; `test_types.py::test_pair_uniqueness` |
 | TR-505 | Money and quantity columns store exact decimals on both SQLite and Postgres. No value round-trips through a float on either backend. | R2.5 | `test_types.py::test_decimal_roundtrip` |
 | TR-506 | Every stored timestamp is timezone-aware UTC. Naive datetimes are rejected at the type boundary. | D17 | `test_types.py::test_utc_only` |
-| TR-507 | Schema is produced by Alembic migrations. `create_all` appears only in test fixtures. | NFR | `test_boundaries.py::test_no_create_all` |
+| TR-507 | Schema is produced by Alembic migrations. `create_all` appears only in test fixtures. | NFR | `test_boundaries.py::test_no_create_all_outside_tests` |
 | TR-508 | Resolutions reference records by `(source_id, reference)`, never by record id, so a correction cannot detach them. | R7.4, D9, D19, AC9 | schema; `test_durability.py::test_survives_correction` |
 | TR-509 | Every record read in a run appears in exactly one `run_item` row carrying exactly one state. State counts sum to records read. | R5.6, AC2 | `test_reconcile.py::test_states_sum` |
 | TR-510 | Value history for a `(source, reference)` is retrievable in one query, ordered by version. | R8.2, R8.3, AC8 | `test_history.py` |
@@ -121,7 +121,7 @@ Numbering is grouped in hundreds so items can be inserted later without renumber
 | TR-701 | A run over 10,000 records per side completes in under 10 seconds on a developer laptop against SQLite. | NFR | `test_perf.py::test_run_duration` |
 | TR-702 | Re-running over unchanged inputs and unchanged resolutions produces identical states, pairs, and counts. | NFR, AC10 | `test_reconcile.py::test_idempotent` |
 | TR-703 | Clone to running application in at most four commands, with no external service to start. | NFR | fresh-clone check; README |
-| TR-704 | The database is selected by `DATABASE_URL` alone. No code path branches on backend. | NFR | `test_boundaries.py::test_no_dialect_branch` |
+| TR-704 | The database is selected by `DATABASE_URL` alone. No code path branches on backend. | NFR | `test_boundaries.py::test_no_dialect_branching` |
 | TR-705 | Configuration is validated at startup. Invalid source config or tolerance profile fails before the first request is served. | NFR | `test_config.py::test_fails_fast` |
 | TR-706 | Ingest and run emit structured log events carrying source, period, version, and result counts. | NFR | `test_logging.py` |
 | TR-707 | `tests/unit` runs with no database, no network, and no import of `app`. | brief | `pytest tests/unit` in a clean environment |

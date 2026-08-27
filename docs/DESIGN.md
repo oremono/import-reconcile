@@ -207,11 +207,11 @@ No expected failure produces a 5xx. A duplicate file is a message on the page, n
 
 | Lives in | Holds | Validated |
 |---|---|---|
-| `source.format_config` (DB) | Column map, timestamp patterns, timezone, vocabulary | Pydantic model at load; a source with no declared timezone fails |
-| `tolerance_profile` (DB) | The six thresholds, per source pair | Pydantic model at load |
+| `source.format_config` (DB) | Column map, timestamp patterns, timezone, vocabulary | `core.format.source_format_from_config`, raising `FormatConfigError`; a source with no declared timezone fails |
+| `tolerance_profile` (DB) | The six thresholds, per source pair | `core.tolerance.tolerances_from_config`, raising `ToleranceConfigError` |
 | Environment | `DATABASE_URL`, log level | Pydantic settings at startup |
 
-Everything is validated before the first request is served (TR-705). A tolerance profile that fails to parse fails the process, not the run — discovering it halfway through reconciling is worse than not starting.
+Everything is validated before the first request is served (TR-705). Pydantic covers the environment only; the two database-held configurations are validated in `core/`, because that is where they are consumed and `core/` imports the standard library alone (CLAUDE.md invariant 2). Validating them with Pydantic would put the check on the wrong side of that boundary, leaving a `core` consumer unprotected. A tolerance profile that fails to parse fails the process, not the run — discovering it halfway through reconciling is worse than not starting.
 
 ---
 
