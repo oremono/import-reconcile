@@ -443,3 +443,56 @@ def test_a_stored_decision_reaches_the_run(db_session: Session, seeded_sources) 
     assert record.reference not in [
         db_session.get(Record, i.record_id).reference for i in worklist(db_session, after.id)
     ]
+
+
+# ---------------------------------------------------------------------------
+# A run over nothing is not a clean morning
+# ---------------------------------------------------------------------------
+
+
+def test_a_run_with_no_files_on_either_side_is_refused(db_session: Session, seeded_sources) -> None:
+    """Found by walking the app as an analyst would.
+
+    With no files loaded the run succeeded and reported a green "0 - nothing
+    needs a decision. Every record read is accounted for." That is true and
+    useless: nothing was read. On a morning when the counterparty's file has
+    not arrived, it invites someone to close the period on an empty run.
+    """
+    from app.services.reconcile import ReconcileError, run_reconciliation
+
+    with pytest.raises(ReconcileError) as caught:
+        run_reconciliation(db_session, seeded_sources.ledger, seeded_sources.statement, *PERIOD)
+    assert "No files are loaded" in str(caught.value)
+
+
+def test_no_run_row_survives_the_refusal(db_session: Session, seeded_sources) -> None:
+    from sqlalchemy import func, select
+
+    from app.db.models import Run
+    from app.services.reconcile import ReconcileError, run_reconciliation
+
+    with pytest.raises(ReconcileError):
+        run_reconciliation(db_session, seeded_sources.ledger, seeded_sources.statement, *PERIOD)
+    assert db_session.scalar(select(func.count()).select_from(Run)) == 0
+
+
+def test_one_empty_side_still_runs(db_session: Session, seeded_sources) -> None:
+    """Only both sides empty is meaningless.
+
+    One side empty means every row on the other side is genuinely unmatched,
+    which is exactly the finding an analyst needs to see.
+    """
+    from pathlib import Path
+
+    from app.services.ingest import ingest_file
+    from app.services.reconcile import run_reconciliation
+
+    ledger = Path(__file__).resolve().parents[2] / "data" / "ledger_2025-07-01_07.csv"
+    ingest_file(db_session, seeded_sources.ledger, ledger.read_bytes(), *PERIOD, ledger.name)
+
+    run = run_reconciliation(db_session, seeded_sources.ledger, seeded_sources.statement, *PERIOD)
+    # Forty rows load; three of them are cancelled, so they are set aside
+    # rather than reported as missing a counterpart.
+    assert run.counts["unmatched"] == 37
+    assert run.counts["excluded"] == 3
+    assert run.counts["agreed"] == 0

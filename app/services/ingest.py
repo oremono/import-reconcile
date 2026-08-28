@@ -18,7 +18,7 @@ import csv
 import hashlib
 import io
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from sqlalchemy import select
@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import FileBatch, Record, RejectedRow, Source
 from app.observability import log_ingest
+from core.compare import format_timestamp
 from core.format import source_format_from_config
 from core.model import NormalizedRecord, RowError
 from core.normalize import HeaderError, normalize_rows
@@ -43,9 +44,11 @@ class DuplicateFileError(IngestError):
     """This exact file has already been accepted for this source (TR-102)."""
 
     def __init__(self, filename: str, accepted_at: object, version_no: int) -> None:
+        when = (
+            format_timestamp(accepted_at) if isinstance(accepted_at, datetime) else str(accepted_at)
+        )
         super().__init__(
-            f"Already accepted on {accepted_at} as version {version_no} "
-            f"({filename}). Nothing has changed."
+            f"Already accepted on {when} as version {version_no} ({filename}). Nothing has changed."
         )
         self.accepted_at = accepted_at
         self.version_no = version_no

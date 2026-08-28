@@ -207,3 +207,28 @@ def test_amounts_survive_the_round_trip_exactly(db_session: Session, seeded_sour
     assert first is not None
     assert first.gross_amount == Decimal("4640.00")
     assert first.quantity * first.unit_price == first.gross_amount
+
+
+def test_the_duplicate_message_reads_as_a_date_not_a_machine_timestamp(
+    db_session: Session, seeded_sources
+) -> None:
+    """The message an analyst actually sees on the busiest path."""
+    load(db_session, seeded_sources.statement, STATEMENT)
+    with pytest.raises(DuplicateFileError) as caught:
+        load(db_session, seeded_sources.statement, RESEND)
+    message = str(caught.value)
+    assert "+00:00" not in message, message
+    assert "UTC" in message, message
+
+
+def test_a_rejected_row_explains_itself_without_a_format_string(
+    db_session: Session, seeded_sources
+) -> None:
+    """A rejected row is read by whoever chases the counterparty.
+
+    ``%Y-%m-%dT%H:%M:%SZ`` tells them nothing; an example tells them everything.
+    """
+    load(db_session, seeded_sources.ledger, LEDGER)
+    reasons = " ".join(r.reason for r in db_session.scalars(select(RejectedRow)))
+    assert "%Y" not in reasons, reasons
+    assert "2025-07-01T09:15:00Z" in reasons, reasons

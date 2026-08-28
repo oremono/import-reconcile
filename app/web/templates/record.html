@@ -23,6 +23,27 @@
   {% endif %}
 </p>
 
+{% if decision_is_newer %}
+<div class="card">
+  <h3>Decided since this run</h3>
+  <p>
+    {% if decision.kind == 'manual_match' %}
+      Paired with <span class="mono">{{ decision.right_reference }}</span>
+    {% elif decision.kind == 'accept_unmatched' %}
+      Accepted as having no counterpart
+    {% else %}
+      <span class="mono">{{ decision.right_reference }}</span> rejected as a counterpart
+    {% endif %}
+    on {{ decision.created_at | ts }} by <strong>{{ decision.author }}</strong>:
+    &ldquo;{{ decision.reason }}&rdquo;
+  </p>
+  <p class="note">
+    The state above is what was true when run #{{ run.id }} executed. Start a new run
+    from the <a href="/">home page</a> to see this decision applied.
+  </p>
+</div>
+{% endif %}
+
 
 <div class="card">
   <h3>The record</h3>
@@ -92,7 +113,7 @@
     <input type="hidden" name="return_to" value="{{ return_to }}">
     <div class="row">
       <label><span>Reason</span><input type="text" name="reason" required placeholder="Why it is not this one"></label>
-      <label><span>Your name</span><input type="text" name="author" required></label>
+      <label><span>Your name</span><input type="text" name="author" required placeholder="Who is deciding"></label>
     </div>
     <div class="actions"><button class="danger" type="submit">Not this one &mdash; stop suggesting it</button></div>
   </form>
@@ -125,7 +146,7 @@
     <div class="row">
       <label><span>Reason</span><input type="text" name="reason" required
         placeholder="Why these are the same transaction"></label>
-      <label><span>Your name</span><input type="text" name="author" required></label>
+      <label><span>Your name</span><input type="text" name="author" required placeholder="Who is deciding"></label>
     </div>
     <div class="actions"><button type="submit">Pair them</button></div>
   </form>
@@ -145,7 +166,7 @@
     <div class="row">
       <label><span>Reason</span><input type="text" name="reason" required
         placeholder="How you established there is no counterpart"></label>
-      <label><span>Your name</span><input type="text" name="author" required></label>
+      <label><span>Your name</span><input type="text" name="author" required placeholder="Who is deciding"></label>
     </div>
     <div class="actions"><button class="secondary" type="submit">Accept as having no counterpart</button></div>
   </form>

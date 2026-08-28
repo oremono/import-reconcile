@@ -70,6 +70,7 @@ from app.services.resolve import (
     accept_unmatched,
     manual_match,
     reject_suggestion,
+    resolution_for,
 )
 from app.services.resolve import record_history as load_record_history
 from core.compare import format_decimal, format_duration, format_timestamp
@@ -996,6 +997,17 @@ def record_detail(
         select(RunItem).where(RunItem.run_id == run_id, RunItem.record_id == record_id)
     )
 
+    # A decision recorded since this run finished is not visible in its
+    # run_item, so the page would otherwise show a green "paired" banner above
+    # a badge insisting nothing has been paired. The decision is what is true
+    # now; the state is what was true when the run executed.
+    decision = resolution_for(session, this_source, record.reference) if this_source else None
+    if decision is not None and decision.revoked_at is not None:
+        decision = None
+    decision_is_newer = decision is not None and (
+        run.finished_at is None or decision.created_at > run.finished_at
+    )
+
     return _render(
         request,
         "record.html",
@@ -1004,6 +1016,8 @@ def record_detail(
             "run": run,
             "record": record,
             "item": item,
+            "decision": decision,
+            "decision_is_newer": decision_is_newer,
             "this_source": this_source,
             "other_source": other_source,
             "left_source": names.get(run.left_source_id),

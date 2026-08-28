@@ -343,6 +343,17 @@ def run_reconciliation(
         current_records(session, right_source, period_start, period_end), right_source.code
     )
 
+    if not left_rows and not right_rows:
+        # A run over two empty sides is not a clean morning, it is a morning
+        # where nothing arrived. Recording it would put a green "nothing needs
+        # a decision" on the screen and invite someone to close the period on
+        # the strength of it. One side empty is different: every row on the
+        # other side is then genuinely unmatched, which is a real finding.
+        raise ReconcileError(
+            f"No files are loaded for {left_source.code} or {right_source.code} "
+            f"over {period_start} to {period_end}. Load both sides first."
+        )
+
     prior = _load_prior_resolutions(session, left_source, right_source)
 
     result = match(

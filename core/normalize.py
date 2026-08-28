@@ -212,7 +212,25 @@ def _timestamp(text: str, fmt: SourceFormat) -> datetime:
         parsed = _parse(text, pattern)
         if parsed is not None:
             return _to_utc(parsed, text, fmt)
-    raise _RowRejected(f"timestamp {text!r} matches none of {list(fmt.timestamp_formats)}")
+    raise _RowRejected(f"timestamp {text!r} is not in this source's format ({_example(fmt)})")
+
+
+def _example(fmt: SourceFormat) -> str:
+    """What this source's timestamps look like, as an example rather than a pattern.
+
+    A rejected row is read by an analyst deciding whether to chase the
+    counterparty, not by the person who wrote the config. ``%Y-%m-%dT%H:%M:%SZ``
+    tells them nothing; ``2025-07-01T09:15:00Z`` tells them everything.
+    """
+    sample = datetime(2025, 7, 1, 9, 15, tzinfo=UTC)
+    for pattern in fmt.timestamp_formats:
+        if pattern == EPOCH_SECONDS:
+            return "epoch seconds, e.g. 1751361300"
+        try:
+            return f"e.g. {sample.strftime(pattern)}"
+        except ValueError:  # pragma: no cover - a pattern strftime cannot render
+            continue
+    return "no format configured"
 
 
 def _parse(text: str, pattern: str) -> datetime | None:
