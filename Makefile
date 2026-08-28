@@ -27,5 +27,7 @@ seed:
 	uv run alembic upgrade head
 	uv run python -m app.seed
 
-run:
+# Depends on seed so `make run` cannot start against an unmigrated database.
+# Both steps are idempotent.
+run: seed
 	uv run uvicorn app.main:app --reload

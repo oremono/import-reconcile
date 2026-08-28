@@ -822,3 +822,58 @@ def test_history_shows_every_version(client: TestClient) -> None:
     assert CORRECTION_FILE in page.text
     assert "v1" in page.text
     assert "v2" in page.text
+
+
+# ---------------------------------------------------------------------------
+# A skipped setup step must not look like a broken server
+# ---------------------------------------------------------------------------
+
+
+def test_schema_is_missing_recognises_both_backends() -> None:
+    """SQLite and Postgres word it differently, and neither may be named.
+
+    TR-704 forbids branching on which database is in play, so the two phrasings
+    are matched rather than the dialect being asked.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    from app.main import schema_is_missing
+
+    sqlite_error = OperationalError("select 1", {}, Exception("no such table: source"))
+    postgres_error = OperationalError("select 1", {}, Exception('relation "source" does not exist'))
+    unrelated = OperationalError("select 1", {}, Exception("database is locked"))
+
+    assert schema_is_missing(sqlite_error)
+    assert schema_is_missing(postgres_error)
+    assert not schema_is_missing(unrelated)
+
+
+def test_an_unmigrated_database_explains_itself() -> None:
+    """SQLite creates the file on connect, so a database that was never
+    migrated does not announce itself: the server starts, and then every page
+    fails deep inside a query. The page has to name the step that was skipped.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    from app.db.session import session_dependency
+    from app.main import app
+
+    def _unmigrated():
+        raise OperationalError("select 1", {}, Exception("no such table: source"))
+        yield  # pragma: no cover - unreachable, keeps this a generator
+
+    previous = app.dependency_overrides.get(session_dependency)
+    app.dependency_overrides[session_dependency] = _unmigrated
+    try:
+        with TestClient(app, raise_server_exceptions=False) as unmigrated_client:
+            response = unmigrated_client.get("/")
+    finally:
+        if previous is None:
+            app.dependency_overrides.pop(session_dependency, None)
+        else:
+            app.dependency_overrides[session_dependency] = previous
+
+    assert response.status_code == 503
+    assert "alembic upgrade head" in response.text
+    assert "app.seed" in response.text
+    assert "Traceback" not in response.text

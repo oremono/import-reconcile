@@ -15,10 +15,22 @@ not settle on its own.
 
 ```bash
 uv sync
+make run          # migrates, seeds, then serves on http://127.0.0.1:8000
+```
+
+Or the same thing spelled out:
+
+```bash
+uv sync
 uv run alembic upgrade head
 uv run python -m app.seed
 uv run uvicorn app.main:app
 ```
+
+SQLite creates its file the moment anything connects, so skipping the migration
+does not fail loudly — the server starts and every page then fails inside a
+query. `make run` migrates first, and a database with no schema renders a page
+naming the step that was missed rather than a stack trace.
 
 Then open <http://127.0.0.1:8000>. Four commands, no service to install: the
 database is SQLite by default. Postgres is a `DATABASE_URL` and nothing else.

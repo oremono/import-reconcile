@@ -19,17 +19,51 @@ from __future__ import annotations
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
-from app.observability import configure_logging
+from app.observability import configure_logging, get_logger
 from app.services.ingest import IngestError
 from app.web.routes import error_page, redirect_with_message, router
 
 configure_logging()
 
+SETUP_INSTRUCTIONS = (
+    "This database has no schema yet. From the project directory run "
+    "`uv run alembic upgrade head` and then `uv run python -m app.seed`, "
+    "and reload this page."
+)
+
+
+def schema_is_missing(error: BaseException) -> bool:
+    """Is this the "you skipped a setup step" failure, rather than a real fault?
+
+    SQLite creates an empty file the moment anything connects, so a database
+    that was never migrated does not announce itself: the server starts, and
+    then every page fails deep inside a query. Postgres says "does not exist"
+    where SQLite says "no such table"; matching both keeps this from being a
+    branch on which backend is in play (TR-704).
+    """
+    text = str(getattr(error, "orig", error)).lower()
+    return "no such table" in text or "does not exist" in text
+
+
 app = FastAPI(title="import-reconcile", docs_url=None, redoc_url=None)
 app.include_router(router)
+
+
+@app.exception_handler(OperationalError)
+def _render_database_error(request: Request, exc: OperationalError) -> Response:
+    """A missing schema is a setup step, not a server fault. Say which one."""
+    if schema_is_missing(exc):
+        get_logger().error("database has no schema; run alembic upgrade head")
+        return error_page(request, 503, SETUP_INSTRUCTIONS)
+    return error_page(
+        request,
+        503,
+        "The database could not be reached. Check DATABASE_URL and try again.",
+    )
 
 
 @app.exception_handler(StarletteHTTPException)
