@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
-from core.compare import compare, format_decimal, format_timestamp
+from core.compare import compare, format_decimal, format_duration, format_timestamp
 from core.model import (
     COMPARED_FIELDS,
     Comparison,
@@ -91,7 +91,7 @@ def test_all_fields_emitted() -> None:
     assert fields["side"].left_value == "BUY"
     assert fields["status"].left_value == "SETTLED"
     assert fields["quantity"].left_value == "100"
-    assert fields["occurred_at"].left_value == "2025-07-01T09:15:00+00:00"
+    assert fields["occurred_at"].left_value == "2025-07-01 09:15:00 UTC"
 
 
 def test_agreement_still_emits_every_field() -> None:
@@ -384,12 +384,44 @@ def test_precision_received_is_the_precision_displayed() -> None:
     assert (quantity.left_value, quantity.right_value) == ("100.000", "100")
 
 
-def test_timestamps_render_as_iso_utc() -> None:
+def test_timestamps_render_readably_in_utc() -> None:
+    """Every stored timestamp is UTC, so the offset is the same on every row.
+
+    Printing it anyway costs six characters on each of two columns and tells
+    the reader nothing. Seconds stay, because two bookings thirty seconds apart
+    must not render identically.
+    """
     ist = timezone(timedelta(hours=5, minutes=30))
     local = datetime(2025, 7, 1, 14, 45, 0, tzinfo=ist)  # 09:15 UTC
-    assert format_timestamp(local) == "2025-07-01T09:15:00+00:00"
+    assert format_timestamp(local) == "2025-07-01 09:15:00 UTC"
 
     result = compare(record(), record("STATEMENT", occurred_at=local), TOL)
     occurred = by_field(result)["occurred_at"]
-    assert occurred.left_value == occurred.right_value == "2025-07-01T09:15:00+00:00"
+    assert occurred.left_value == occurred.right_value == "2025-07-01 09:15:00 UTC"
     assert not occurred.differs
+
+
+def test_a_duration_reads_in_the_largest_unit_that_stays_true() -> None:
+    """The stored value keeps every digit; this is only how it is shown."""
+    assert format_duration(Decimal("2400.000000000000")) == "40 min"
+    assert format_duration(Decimal(0)) == "0 s"
+    assert format_duration(Decimal("0.5")) == "0.5 s"
+    assert format_duration(Decimal(45)) == "45 s"
+    assert format_duration(Decimal(60)) == "1 min"
+    assert format_duration(Decimal(90)) == "1 min 30 s"
+    assert format_duration(Decimal(3600)) == "1 h"
+    assert format_duration(Decimal(7500)) == "2 h 5 min"
+    assert format_duration(Decimal(86400)) == "1 d"
+    assert format_duration(Decimal(90000)) == "1 d 1 h"
+
+
+def test_a_duration_is_signed_only_by_its_field_not_its_text() -> None:
+    """Direction is carried by ``abs_diff``; the rendered size is a magnitude."""
+    assert format_duration(Decimal(-2400)) == format_duration(Decimal(2400))
+
+
+def test_no_rendered_duration_carries_storage_padding() -> None:
+    """The defect this replaced: 2400.000000000000 s, shown next to money."""
+    for seconds in (0, 1, 59, 60, 61, 599, 600, 3599, 3600, 86399, 86400):
+        rendered = format_duration(Decimal(seconds).quantize(Decimal("0.000000000001")))
+        assert "000000" not in rendered, rendered

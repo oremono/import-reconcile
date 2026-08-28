@@ -54,8 +54,45 @@ def format_decimal(value: Decimal) -> str:
 
 
 def format_timestamp(value: datetime) -> str:
-    """ISO-8601 in UTC. Every stored timestamp is already UTC (CLAUDE.md invariant 6)."""
-    return value.astimezone(UTC).isoformat()
+    """A timestamp as a person reads it, in UTC.
+
+    ``2025-07-03 05:40:00 UTC`` rather than ``2025-07-03T05:40:00+00:00``. The
+    ``T`` and the offset are machine punctuation: every stored timestamp is
+    already UTC (CLAUDE.md invariant 6), so the offset is the same on every row
+    on the page and carries no information. Seconds are kept, because two
+    bookings thirty seconds apart must not render identically on a screen whose
+    job is making a difference visible.
+    """
+    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def format_duration(seconds: Decimal) -> str:
+    """A time difference in the largest unit that still tells the truth.
+
+    A forty-minute gap reads as ``40 min``, not ``2400.000000000000 s``. The
+    stored value keeps every digit; this is only how it is shown.
+
+    Decimal throughout - dividing by 60 in float would be a defect on the one
+    path that exists to detect other people's rounding (CLAUDE.md invariant 1).
+    """
+    magnitude = abs(seconds)
+    if magnitude == 0:
+        return "0 s"
+    if magnitude < 60:
+        return f"{format_decimal(magnitude.normalize())} s"
+
+    whole = int(magnitude)
+    if magnitude < 3600:
+        minutes, remainder = divmod(whole, 60)
+        return f"{minutes} min {remainder} s" if remainder else f"{minutes} min"
+    if magnitude < 86400:
+        hours, remainder = divmod(whole, 3600)
+        minutes = remainder // 60
+        return f"{hours} h {minutes} min" if minutes else f"{hours} h"
+
+    days, remainder = divmod(whole, 86400)
+    hours = remainder // 3600
+    return f"{days} d {hours} h" if hours else f"{days} d"
 
 
 # ---------------------------------------------------------------------------

@@ -45,7 +45,7 @@
         <td>{{ row.field | words }}</td>
         <td class="mono">{{ row.left_value | num }}</td>
         <td class="mono">{{ row.right_value | num }}</td>
-        <td class="num mono">{% if row.abs_diff is not none %}{{ row.abs_diff | dec }}{% if row.field == 'occurred_at' %} s{% endif %}{% else %}&mdash;{% endif %}</td>
+        <td class="num mono">{% if row.abs_diff is not none %}{% if row.field == 'occurred_at' %}{{ row.abs_diff | dur }}{% else %}{{ row.abs_diff | dec }}{% endif %}{% else %}&mdash;{% endif %}</td>
         <td class="num mono">{% if row.rel_diff is not none %}{{ row.rel_diff | pct }}{% else %}&mdash;{% endif %}</td>
         <td>
           {% if not row.differs %}<span class="note">agrees</span>

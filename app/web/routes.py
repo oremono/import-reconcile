@@ -72,7 +72,7 @@ from app.services.resolve import (
     reject_suggestion,
 )
 from app.services.resolve import record_history as load_record_history
-from core.compare import format_decimal, format_timestamp
+from core.compare import format_decimal, format_duration, format_timestamp
 from core.model import (
     COMPARED_FIELDS,
     WORKLIST_STATES,
@@ -112,6 +112,10 @@ def _trimmed(value: Decimal) -> Decimal:
 
 
 _CENTS = Decimal("0.01")
+
+
+def _duration(value: Decimal | None) -> str:
+    return "" if value is None else format_duration(value)
 
 
 def _decimal(value: Decimal | None) -> str:
@@ -156,6 +160,7 @@ TEMPLATES.env.filters["dec"] = _decimal
 TEMPLATES.env.filters["num"] = _number
 TEMPLATES.env.filters["pct"] = _percent
 TEMPLATES.env.filters["ts"] = _timestamp
+TEMPLATES.env.filters["dur"] = _duration
 TEMPLATES.env.filters["words"] = _words
 
 router = APIRouter()
@@ -465,12 +470,24 @@ def _magnitude(field: str, value: Decimal) -> str:
     """A difference with its units attached.
 
     ``occurred_at`` is compared in seconds, so a forty-minute gap comes back as
-    ``2400``. Printed bare next to a column of amounts it reads as money.
+    ``2400``. Printed bare next to a column of amounts it reads as money, and
+    printed at storage scale it reads as ``2400.000000000000``, which is worse.
     """
     if field == OCCURRED_AT:
-        minutes = (value / 60).quantize(Decimal("0.1"))
-        return f"{value:f} s ({minutes:f} min)" if value >= 60 else f"{value:f} s"
+        return format_duration(value)
     return _decimal(value)
+
+
+def _values(field: str, left: str, right: str) -> str:
+    """The two sides of a difference, without repeating what they share.
+
+    Two timestamps on the same day differ in the part after the date, so
+    printing the date twice pushes the part that actually differs off the end
+    of the cell. Same day, one date.
+    """
+    if field == OCCURRED_AT and left[:10] == right[:10] and left.endswith(" UTC"):
+        return f"{left[:-4]} vs {right[11:]}"
+    return f"{_number(left)} vs {_number(right)}"
 
 
 _STATE_HEADLINES = {
@@ -487,8 +504,8 @@ def _headline(item: RunItem, diffs: Sequence[FieldDiffRow]) -> tuple[str, Decima
     if leading is not None:
         magnitude = leading.rel_diff if leading.rel_diff is not None else Decimal(0)
         text = (
-            f"{_words(leading.field)}: {_number(leading.left_value)} "
-            f"vs {_number(leading.right_value)}"
+            f"{_words(leading.field)}: "
+            f"{_values(leading.field, leading.left_value, leading.right_value)}"
         )
         if leading.abs_diff is not None:
             text += f", off by {_magnitude(leading.field, abs(leading.abs_diff))}"
