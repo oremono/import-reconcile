@@ -33,3 +33,4 @@ reconcile.db
 
 # Local run artefacts
 .claude/launch.json
+VIDEO_SCRIPT.md
