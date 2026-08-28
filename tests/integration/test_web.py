@@ -877,3 +877,34 @@ def test_an_unmigrated_database_explains_itself() -> None:
     assert "alembic upgrade head" in response.text
     assert "app.seed" in response.text
     assert "Traceback" not in response.text
+
+
+def test_a_trade_that_agrees_is_still_reachable(client: TestClient, loaded: TestClient) -> None:
+    """Found by using the app: a row vanished from the UI once it agreed.
+
+    The worklist lists only what needs a person, which is the point of it. But
+    "what did this row used to say?" is asked most often about a row a
+    correction has just fixed - and that is exactly the row that has left the
+    list. Without a lookup there was no path to it at all.
+    """
+    response = client.get(
+        "/records/lookup",
+        params={"source": "statement", "reference": " T-1010 "},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/records/statement/T-1010/history"
+
+    landed = client.get(response.headers["location"])
+    assert landed.status_code == 200
+    assert "T-1010" in landed.text
+
+
+def test_the_lookup_refuses_an_empty_reference(client: TestClient) -> None:
+    response = client.get(
+        "/records/lookup",
+        params={"source": "statement", "reference": "   "},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert "reference" in response.headers["location"].lower()

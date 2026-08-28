@@ -35,7 +35,7 @@ from decimal import Decimal, InvalidOperation
 from http import HTTPStatus
 from pathlib import Path
 from typing import Annotated, Any
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.templating import Jinja2Templates
@@ -840,6 +840,11 @@ def run_detail(
             "context_states": [(s.value, counts.get(s.value, 0)) for s in CONTEXT_STATES],
             "side_totals": _side_totals(by_side),
             "unmatched_by_side": _unmatched_by_side(by_side),
+            "sources": [
+                source
+                for source in (names.get(run.left_source_id), names.get(run.right_source_id))
+                if source is not None
+            ],
         },
     )
 
@@ -1126,6 +1131,22 @@ def _dispatch_resolution(
 # ---------------------------------------------------------------------------
 # GET /records/{source}/{reference}/history
 # ---------------------------------------------------------------------------
+
+
+@router.get("/records/lookup")
+def lookup_record(source: str, reference: str) -> Response:
+    """Jump to a trade's history by reference.
+
+    Without this a trade becomes unreachable the moment it agrees, because the
+    worklist only lists what needs a person - which is the whole point of the
+    worklist. But "what did this row used to say?" is asked most often about a
+    row a correction has just fixed, and that is exactly the row that has left
+    the list.
+    """
+    trimmed = reference.strip()
+    if not trimmed:
+        return redirect_with_message("/", "Enter a reference to look up.", level="error")
+    return RedirectResponse(f"/records/{quote(source)}/{quote(trimmed)}/history", status_code=303)
 
 
 @router.get("/records/{source_code}/{reference}/history")

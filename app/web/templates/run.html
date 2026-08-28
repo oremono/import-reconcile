@@ -53,4 +53,26 @@
   {% endfor %}
 </div>
 
+
+<h2>Look up a trade</h2>
+<div class="card">
+  <p class="sub">
+    A trade that agrees is not on the worklist &mdash; that is the point of the
+    worklist. Its history is still here, including anything a correction changed.
+  </p>
+  <form class="row" method="get" action="/records/lookup">
+    <label>Source
+      <select name="source" required>
+        {% for source in sources %}
+        <option value="{{ source.code }}">{{ source.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Reference
+      <input type="text" name="reference" placeholder="e.g. T-1010" required>
+    </label>
+    <button type="submit">Show its history</button>
+  </form>
+</div>
+
 {% endblock %}
