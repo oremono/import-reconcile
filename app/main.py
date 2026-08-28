@@ -59,10 +59,16 @@ def _render_database_error(request: Request, exc: OperationalError) -> Response:
     if schema_is_missing(exc):
         get_logger().error("database has no schema; run alembic upgrade head")
         return error_page(request, 503, SETUP_INSTRUCTIONS)
+    # Log the driver's own words. The page has to stay readable, but a
+    # swallowed OperationalError is very hard to diagnose from the outside -
+    # "could not be reached" covers a stale connection to a deleted file, a
+    # lock, and a wrong URL, and only the log can tell them apart.
+    get_logger().error("database error: %s", getattr(exc, "orig", exc))
     return error_page(
         request,
         503,
-        "The database could not be reached. Check DATABASE_URL and try again.",
+        "The database could not be reached. Check DATABASE_URL, and see the "
+        "server log for what the database reported.",
     )
 
 
