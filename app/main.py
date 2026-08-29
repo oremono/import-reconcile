@@ -17,17 +17,21 @@ Two handlers are installed:
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
+from app.config import refuse_ephemeral_sqlite, settings
 from app.observability import configure_logging, get_logger
 from app.services.ingest import IngestError
 from app.web.routes import error_page, redirect_with_message, router
 
 configure_logging()
+refuse_ephemeral_sqlite(settings, os.environ)
 
 SETUP_INSTRUCTIONS = (
     "This database has no schema yet. From the project directory run "

@@ -9,7 +9,7 @@ services:
     name: import-reconcile
     runtime: python
     plan: free
-    region: oregon
+    region: singapore
 
     # uv is not preinstalled on Render's Python image, and --frozen makes the
     # build fail loudly if uv.lock and pyproject.toml have drifted apart,
@@ -42,4 +42,4 @@ databases:
     plan: free
     databaseName: reconcile
     user: reconcile
-    postgresMajorVersion: "16"
+    postgresMajorVersion: "17"
