@@ -7,7 +7,7 @@ is too small to care about?_ — is the one it was built around.
 
 |                |                                                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **Live app**   | `[RENDER URL]` — free tier, so the first request after a quiet spell takes ~50s to wake                              |
+| **Live app**   | <https://import-reconcile.onrender.com> — free tier, so the first request after a quiet spell takes ~50s to wake     |
 | **Video demo** | <https://drive.google.com/file/d/1cGFp6rpikQKP71QXVs7tM-hXUmDOzxBr/view>                                            |
 | **Run locally**| `uv sync && make run` — two commands from clone to working app, nothing to install                                   |
 | **Scale**      | 3 sources · 3 file formats · 6 sample files · one week of trades, 40 rows a side                                    |
@@ -285,7 +285,7 @@ application.
 ## 10. Deployment
 
 Deployed on [Render](https://render.com) from [`render.yaml`](render.yaml) — one web service and one
-Postgres 16 database, both on the free plan. Create a Blueprint from this repository and Render reads
+Postgres 17 database, both on the free plan, both in Singapore. Create a Blueprint from this repository and Render reads
 that file; nothing else needs configuring.
 
 Three things in it are worth explaining.
@@ -304,8 +304,23 @@ once, in [`app/config.py`](app/config.py), to name the driver. That is a spellin
 edge, not a branch on backend — nothing downstream behaves differently, which is what TR-704 actually
 forbids, and the identical test suite passing on both engines is the evidence.
 
+**A missing `DATABASE_URL` refuses to start.** The SQLite default is what makes clone-and-run work
+locally, but a platform's disk is ephemeral — there the same default would serve pages, accept
+uploads, and lose all of it on the next restart, with nothing looking broken until someone asked
+where their work went. The first deploy of this service failed for exactly that reason, which is the
+guard working rather than a problem.
+
 **The free plan sleeps** after fifteen minutes of inactivity, so the first request after a quiet spell
 takes about fifty seconds while the service wakes. Nothing is broken; it is just cold.
+
+**The live database expires on 2026-09-28**, which is Render's thirty-day limit on a free Postgres.
+After that the app will still wake but will have nothing behind it.
+
+**What you will find there.** The deployment has already been walked end to end: five runs, a pairing
+made by hand, an acceptance that a later correction revoked, three versions of the counterparty file,
+and a third counterparty reconciled. Everything is fabricated data from
+[`scripts/make_sample_data.py`](scripts/make_sample_data.py), and you can upload the same files again
+yourself — a resend is refused, so nothing you do can double-count anything.
 
 **There is no login.** That is the exclusion named in [§3](#3-what-i-deliberately-left-out-and-why),
 and on a public URL it means anyone can upload a file or record a resolution. Everything in the demo
