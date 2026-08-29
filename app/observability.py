@@ -192,3 +192,58 @@ def log_run(
             "duration_seconds": duration_seconds,
         },
     )
+
+
+REQUEST_EVENT = "request"
+
+#: Health checks are the host's business, not a visit. Render polls this every
+#: few seconds and logging it would bury every real request under machine noise.
+UNLOGGED_PATHS = frozenset({"/healthz", "/favicon.ico"})
+
+
+def visitor_prefix(client_host: str | None) -> str:
+    """A coarse, stable identifier for a caller. Never the full address.
+
+    Enough to tell one visitor from another and to spot a crawler; not enough to
+    identify a person. IPv4 keeps its first three octets, IPv6 its routing
+    prefix, and anything unrecognised becomes "unknown" rather than being
+    logged verbatim by accident.
+    """
+    if not client_host:
+        return "unknown"
+    if ":" in client_host:
+        parts = client_host.split(":")
+        return ":".join(parts[:3]) + "::/48" if len(parts) >= 3 else "unknown"
+    octets = client_host.split(".")
+    return ".".join(octets[:3]) + ".0/24" if len(octets) == 4 else "unknown"
+
+
+def log_request(
+    *,
+    method: str,
+    path: str,
+    status: int,
+    duration_ms: int,
+    visitor: str,
+    user_agent: str | None = None,
+) -> None:
+    """One structured line per request, so a visit can be counted rather than read.
+
+    The host's own request logs are a paid feature, and the server's access log
+    is prose. This is the same information as a queryable object.
+    """
+    get_logger().info(
+        "%s %s %s",
+        method,
+        path,
+        status,
+        extra={
+            "event": REQUEST_EVENT,
+            "method": method,
+            "path": path,
+            "status": status,
+            "duration_ms": duration_ms,
+            "visitor": visitor,
+            "user_agent": (user_agent or "")[:120] or None,
+        },
+    )

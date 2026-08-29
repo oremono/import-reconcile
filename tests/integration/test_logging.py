@@ -194,3 +194,56 @@ def test_configure_logging_is_idempotent() -> None:
         assert len(logger.handlers) == added
     finally:
         logger.handlers = before
+
+
+# ---------------------------------------------------------------------------
+# Request logging: enough to count a visit, not enough to identify a person
+# ---------------------------------------------------------------------------
+
+
+def _request_events(stream: io.StringIO) -> list[dict]:
+    return [
+        json.loads(line)
+        for line in stream.getvalue().splitlines()
+        if line.startswith("{") and json.loads(line).get("event") == "request"
+    ]
+
+
+def test_a_request_is_logged_as_a_structured_event(log_stream: io.StringIO) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as client:
+        client.get("/runs/999999")
+
+    events = _request_events(log_stream)
+    assert events, "no request event was logged"
+    event = events[-1]
+    assert event["method"] == "GET"
+    assert event["path"] == "/runs/999999"
+    assert event["status"] == 404
+    assert isinstance(event["duration_ms"], int)
+
+
+def test_the_health_check_is_not_logged_as_a_visit(log_stream: io.StringIO) -> None:
+    """The host polls it every few seconds. Logging it buries every real visit."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as client:
+        client.get("/healthz")
+    assert [e for e in _request_events(log_stream) if e["path"] == "/healthz"] == []
+
+
+def test_a_visitor_is_reduced_to_a_network_prefix() -> None:
+    """Enough to tell visitors apart and spot a crawler. Not enough to identify."""
+    from app.observability import visitor_prefix
+
+    assert visitor_prefix("202.141.53.218") == "202.141.53.0/24"
+    assert visitor_prefix("2401:4900:1c80:abcd::1") == "2401:4900:1c80::/48"
+    assert visitor_prefix(None) == "unknown"
+    assert visitor_prefix("not-an-address") == "unknown"
+    for host in ("202.141.53.218", "2401:4900:1c80:abcd::1"):
+        assert host not in visitor_prefix(host), "the full address must never be logged"

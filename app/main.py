@@ -18,6 +18,8 @@ Two handlers are installed:
 from __future__ import annotations
 
 import os
+import time
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -26,7 +28,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
 from app.config import refuse_ephemeral_sqlite, settings
-from app.observability import configure_logging, get_logger
+from app.observability import (
+    UNLOGGED_PATHS,
+    configure_logging,
+    get_logger,
+    log_request,
+    visitor_prefix,
+)
 from app.services.ingest import IngestError
 from app.web.routes import error_page, redirect_with_message, router
 
@@ -74,6 +82,32 @@ def _render_database_error(request: Request, exc: OperationalError) -> Response:
         "The database could not be reached. Check DATABASE_URL, and see the "
         "server log for what the database reported.",
     )
+
+
+@app.middleware("http")
+async def _record_request(request: Request, call_next: Any) -> Response:
+    """One structured line per request, so visits can be counted.
+
+    The host's structured request logs are a paid feature and the server's own
+    access log is prose, so neither answers "has anybody opened this?" without
+    somebody reading it. This emits the same facts as a queryable object.
+
+    Nothing here can fail a request: the log is written after the response is
+    produced, and the client address is reduced to a network prefix rather than
+    stored whole.
+    """
+    started = time.monotonic_ns()
+    response: Response = await call_next(request)
+    if request.url.path not in UNLOGGED_PATHS:
+        log_request(
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            duration_ms=(time.monotonic_ns() - started) // 1_000_000,
+            visitor=visitor_prefix(request.client.host if request.client else None),
+            user_agent=request.headers.get("user-agent"),
+        )
+    return response
 
 
 @app.get("/healthz", include_in_schema=False)
