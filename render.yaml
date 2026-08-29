@@ -1,0 +1,45 @@
+# Render blueprint. Create a Blueprint from this repository and Render reads it.
+#
+# The web service and the database are both on the free plan, which means the
+# service sleeps after 15 minutes of inactivity - the first request after that
+# takes roughly 50 seconds while it wakes. That is fine for a demo and is
+# stated in the README so nobody thinks it has broken.
+services:
+  - type: web
+    name: import-reconcile
+    runtime: python
+    plan: free
+    region: oregon
+
+    # uv is not preinstalled on Render's Python image, and --frozen makes the
+    # build fail loudly if uv.lock and pyproject.toml have drifted apart,
+    # rather than quietly resolving something the tests never ran against.
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+
+    # Migrate, seed, then serve. Both of the first two are idempotent, so this
+    # is safe on every restart - and running them here means the service can
+    # never come up against a database with no schema, which looks exactly
+    # like a broken server from the outside.
+    startCommand: >-
+      uv run alembic upgrade head &&
+      uv run python -m app.seed &&
+      uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /healthz
+
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: import-reconcile-db
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: LOG_LEVEL
+        value: INFO
+
+databases:
+  - name: import-reconcile-db
+    plan: free
+    databaseName: reconcile
+    user: reconcile
+    postgresMajorVersion: "16"

@@ -72,6 +72,19 @@ def _render_database_error(request: Request, exc: OperationalError) -> Response:
     )
 
 
+@app.get("/healthz", include_in_schema=False)
+def healthz() -> dict[str, str]:
+    """Liveness for the host's health check.
+
+    Deliberately does not touch the database. A health check that fails when
+    the database is briefly unreachable gets the process killed and restarted,
+    which does not fix a database and loses the log that would explain it. A
+    database that is genuinely missing its schema already answers every real
+    page with instructions (TR-605).
+    """
+    return {"status": "ok"}
+
+
 @app.exception_handler(StarletteHTTPException)
 def _render_http_exception(request: Request, exc: StarletteHTTPException) -> Response:
     """A missing run or pair is a page, not a traceback (TR-605)."""
