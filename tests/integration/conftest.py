@@ -14,6 +14,7 @@ an empty database and compares the result to the models.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from typing import Any, NamedTuple
 
@@ -38,13 +39,24 @@ from core.tolerance import tolerances_from_config
 
 @pytest.fixture(scope="session")
 def engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine]:
-    """A fresh SQLite file under pytest's tmp directory, never the repo's own.
+    """A fresh database for the suite, never the repository's own.
 
-    A test suite that writes to ``reconcile.db`` destroys whatever the reviewer
-    was looking at, and starts from whatever the last run happened to leave.
+    SQLite by default, under pytest's tmp directory: a suite that writes to
+    ``reconcile.db`` destroys whatever the reviewer was looking at, and starts
+    from whatever the last run happened to leave behind.
+
+    Set ``TEST_DATABASE_URL`` to run the whole suite against Postgres instead.
+    That is how TR-704 - "the database is selected by URL alone, and no code
+    path branches on backend" - gets proven rather than asserted. The schema is
+    dropped and recreated, so point it at a disposable database.
     """
-    path = tmp_path_factory.mktemp("db") / "test.db"
-    test_engine = create_engine(f"sqlite:///{path}")
+    url = os.environ.get("TEST_DATABASE_URL")
+    if url:
+        test_engine = create_engine(url)
+        Base.metadata.drop_all(test_engine)
+    else:
+        path = tmp_path_factory.mktemp("db") / "test.db"
+        test_engine = create_engine(f"sqlite:///{path}")
 
     _use_real_transactions(test_engine)
     Base.metadata.create_all(test_engine)

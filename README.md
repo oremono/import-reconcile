@@ -168,7 +168,7 @@ Four layers, each buying something different.
 | ----- | ------ | ---- |
 | **Unit** — `uv run pytest tests/unit` | Normalisation, tolerance, comparison, matching. 6 files, **175 tests, 1.5 seconds.** No database, no browser, no import of the application. | Fast enough to run on every save, so it gets run. This is the brief's explicit requirement, checked rather than claimed. |
 | **Guard tests** — part of the unit suite | The architecture itself: the `core/` import boundary, no floats on the money path, no `UPDATE` on a record, no branching on database backend, migrations not `create_all`. | The invariants cannot decay into comments nobody reads. Written before the code they guard, so a violation fails immediately rather than at integration. |
-| **Integration** — `uv run pytest` | 11 files, **150 tests**, against real SQLite. Ingestion, corrections, durability, history, run states, the constraints themselves. | Several requirements are satisfied by a unique index rather than by code, and those are proven by provoking a violation. |
+| **Integration** — `uv run pytest` | 11 files, **150 tests**, against real SQLite — and the same 150 against real Postgres 17 by setting `TEST_DATABASE_URL`. Ingestion, corrections, durability, history, run states, the constraints themselves. | Several requirements are satisfied by a unique index rather than by code, and those are proven by provoking a violation. Running the identical suite on both backends is how "the database is chosen by URL alone" gets proven rather than asserted. |
 | **Browser** — `make e2e` | **7 Playwright tests** driving the real application through a real file picker: the whole morning, plus every expected failure. | Passing tests and a usable screen are different claims. Opt-in, so `make verify` stays runnable without a browser installed. |
 
 ### The oracle
@@ -227,7 +227,7 @@ Ranked. The first is what I would build next.
 | **No pagination on the worklist.** | It degrades exactly when it matters most — a bad reconciliation day renders every item on one page. About an hour. |
 | **No escalation state.** | A break already raised with the counterparty sits on the list with no way to mark it as chased, so the list slowly fills with items nobody can clear. Needs a state, an ageing rule and a filter. |
 | **Last write wins on a resolution.** | Two analysts resolving at once is undefined behaviour. A version column and a conflict message is about an hour, and losing a financial decision to a race is not acceptable for long. |
-| **A run happens inside the request.** | Ten thousand records a side takes three seconds against a ten second budget, so this is fine now. The first genuinely large file makes it visible, and there is no progress indication. |
+| **A run happens inside the request.** | Ten thousand records a side takes 3 seconds against SQLite but **18 against Postgres**, because every row crosses a connection rather than a file handle. Eighteen seconds inside a web request is already poor, and there is no progress indication. This is the gap that a real deployment makes urgent. |
 | **A file is assumed to be a complete restatement of its period.** | If a counterparty ever sent only changed rows, this would read it as a restatement and withdraw everything omitted. The worst failure mode here, because it looks like data rather than an error. Not validated at ingest. |
 | **SQLite by default.** | Right for review, wrong for use — single writer, so two people uploading during a run will collide. Two hours including a compose file. |
 | **No authentication, backups, monitoring or retention policy.** | One user, and a database regenerable from one command. Revisit when this holds anything not reproducible. `run_item` grows without bound. |
@@ -307,6 +307,21 @@ uv run pytest               # everything hermetic
 make verify                 # the oracle: lint, types, coverage, requirement trace, route smoke
 make e2e                    # a real browser; needs `uv run playwright install chromium`
 ```
+
+The integration suite runs against Postgres too, which is how backend
+independence is proven rather than claimed. It drops and recreates the schema,
+so point it at a disposable database:
+
+```bash
+docker run -d --name recon-pg -e POSTGRES_PASSWORD=recon -e POSTGRES_DB=recon \
+  -p 55433:5432 postgres:17-alpine
+
+TEST_DATABASE_URL="postgresql+psycopg://postgres:recon@127.0.0.1:55433/recon" \
+  PERF_BUDGET_SECONDS=30 uv run pytest tests/integration
+```
+
+All 150 pass. The wider performance budget is the only difference, and the
+reason is recorded in [TRADEOFFS.md](docs/TRADEOFFS.md).
 
 ### The sample data, and the order to use it
 

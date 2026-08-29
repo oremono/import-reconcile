@@ -12,6 +12,7 @@ in the repository is a liability that nobody reads and everybody has to clone.
 from __future__ import annotations
 
 import io
+import os
 import time
 from csv import DictWriter
 from datetime import UTC, date, datetime, timedelta
@@ -26,7 +27,15 @@ from app.services.reconcile import run_reconciliation, run_summary, worklist
 
 PERIOD = (date(2025, 7, 1), date(2025, 7, 7))
 SCALE = 10_000
-BUDGET_SECONDS = 10
+# Ten seconds against the default configuration, which is SQLite on local disk.
+#
+# The same run against Postgres over a socket measures about 18 seconds, because
+# every row now crosses a connection rather than a file handle. That is not a
+# regression and it is not a reason to branch on backend (TR-704 forbids it) -
+# it is the honest cost of the deployment, and it is why "move the run out of
+# the request" is ranked where it is in TRADEOFFS. Override the budget when
+# pointing the suite at a real database.
+BUDGET_SECONDS = int(os.environ.get("PERF_BUDGET_SECONDS", "10"))
 
 INSTRUMENTS = ("BTC-USD", "ETH-USD", "ADA-USD", "SOL-USD")
 START = datetime(2025, 7, 1, tzinfo=UTC)
